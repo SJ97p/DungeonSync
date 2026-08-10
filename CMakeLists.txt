@@ -9,12 +9,17 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(DungeonSyncClient
+add_executable(DungeonSyncClient WIN32
     Client/main.cpp
 )
 
 add_executable(DungeonSyncServer
     Server/main.cpp
+)
+
+target_link_libraries(DungeonSyncClient PRIVATE
+    d3d11
+    dxgi
 )
 
 foreach(target DungeonSyncClient DungeonSyncServer)
