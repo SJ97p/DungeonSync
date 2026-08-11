@@ -25,7 +25,7 @@ namespace DungeonSync::Rendering
             std::uint32_t width,
             std::uint32_t height);
 
-        void Render();
+        void Render(float totalSeconds);
 
     private:
         [[nodiscard]] bool CreateDeviceAndSwapChain(
@@ -34,17 +34,20 @@ namespace DungeonSync::Rendering
             std::uint32_t height);
 
         [[nodiscard]] bool CreateRenderTarget();
-        [[nodiscard]] bool CreateTriangleVertexBuffer();
+        [[nodiscard]] bool CreateCubeGeometryBuffers();
         [[nodiscard]] bool CreateShadersAndInputLayout();
+        [[nodiscard]] bool CreateConstantBuffer();
 
         Microsoft::WRL::ComPtr<ID3D11Device> device_;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> deviceContext_;
         Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain_;
         Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTargetView_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer_;
         Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
         Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
         Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer_;
 
         D3D_FEATURE_LEVEL featureLevel_{};
 

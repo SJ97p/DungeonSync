@@ -1,5 +1,5 @@
 #include "Application.h"
-
+#include <chrono>
 #include <cstdlib>
 
 namespace
@@ -47,10 +47,18 @@ namespace DungeonSync
 
             return EXIT_FAILURE;
         }
+        const auto startTime =
+            std::chrono::steady_clock::now();
 
         while (window_.ProcessMessages())
         {
-            renderer_.Render();
+            const auto currentTime =
+                std::chrono::steady_clock::now();
+
+            const std::chrono::duration<float> elapsed =
+                currentTime - startTime;
+
+            renderer_.Render(elapsed.count());
         }
 
         return EXIT_SUCCESS;

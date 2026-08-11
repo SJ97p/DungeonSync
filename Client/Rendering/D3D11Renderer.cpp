@@ -1,28 +1,83 @@
-#include "D3D11Renderer.h"
+﻿#include "D3D11Renderer.h"
 #include <d3dcompiler.h>
+#include <DirectXMath.h>
 #include "Vertex.h"
 #include <iterator>
 #include <cstddef>
+#include <cstring>
 
 using Microsoft::WRL::ComPtr;
 
 
 namespace
 {
-    const DungeonSync::Rendering::Vertex TriangleVertices[]{
-        {
-            { 0.0F, 0.5F, 0.0F },
-            { 1.0F, 0.0F, 0.0F, 1.0F }
-        },
-        {
-            { 0.5F, -0.5F, 0.0F },
-            { 0.0F, 1.0F, 0.0F, 1.0F }
-        },
-        {
-            { -0.5F, -0.5F, 0.0F },
-            { 0.0F, 0.0F, 1.0F, 1.0F }
-        }
+    const DungeonSync::Rendering::Vertex CubeVertices[]{
+    {
+        { -0.5F, -0.5F, -0.5F },
+        { 1.0F, 0.0F, 0.0F, 1.0F }
+    },
+    {
+        { -0.5F,  0.5F, -0.5F },
+        { 0.0F, 1.0F, 0.0F, 1.0F }
+    },
+    {
+        {  0.5F,  0.5F, -0.5F },
+        { 0.0F, 0.0F, 1.0F, 1.0F }
+    },
+    {
+        {  0.5F, -0.5F, -0.5F },
+        { 1.0F, 1.0F, 0.0F, 1.0F }
+    },
+    {
+        { -0.5F, -0.5F,  0.5F },
+        { 1.0F, 0.0F, 1.0F, 1.0F }
+    },
+    {
+        { -0.5F,  0.5F,  0.5F },
+        { 0.0F, 1.0F, 1.0F, 1.0F }
+    },
+    {
+        {  0.5F,  0.5F,  0.5F },
+        { 1.0F, 1.0F, 1.0F, 1.0F }
+    },
+    {
+        {  0.5F, -0.5F,  0.5F },
+        { 0.4F, 0.4F, 0.4F, 1.0F }
+    }
     };
+
+    constexpr std::uint16_t CubeIndices[]{
+        // 카메라에 가까운 면
+        0, 1, 2,
+        0, 2, 3,
+
+        // 뒤쪽 면
+        4, 7, 6,
+        4, 6, 5,
+
+        // 왼쪽 면
+        4, 5, 1,
+        4, 1, 0,
+
+        // 오른쪽 면
+        3, 2, 6,
+        3, 6, 7,
+
+        // 위쪽 면
+        1, 5, 6,
+        1, 6, 2,
+
+        // 아래쪽 면
+        4, 0, 3,
+        4, 3, 7
+    };
+
+    struct alignas(16) SceneConstants
+    {
+        DirectX::XMFLOAT4X4 worldViewProjection;
+    };
+
+    static_assert(sizeof(SceneConstants) % 16 == 0);
 
     HRESULT CompileShader(
         const wchar_t* filePath,
@@ -89,7 +144,12 @@ namespace DungeonSync::Rendering
             return false;
         }
 
-        if (!CreateTriangleVertexBuffer())
+        if (!CreateCubeGeometryBuffers())
+        {
+            return false;
+        }
+
+        if (!CreateConstantBuffer())
         {
             return false;
         }
@@ -207,8 +267,74 @@ namespace DungeonSync::Rendering
         return SUCCEEDED(result);
     }
 
-    void D3D11Renderer::Render()
+    void D3D11Renderer::Render(float totalSeconds)
     {
+        using namespace DirectX;
+
+        // 1. CPU에서 월드·뷰·투영 행렬 계산
+        const XMMATRIX world =
+            XMMatrixRotationX(totalSeconds * 0.7F) *
+            XMMatrixRotationY(totalSeconds);
+
+        const XMVECTOR cameraPosition =
+            XMVectorSet(0.0F, 0.0F, -2.0F, 1.0F);
+
+        const XMVECTOR cameraTarget =
+            XMVectorZero();
+
+        const XMVECTOR cameraUp =
+            XMVectorSet(0.0F, 1.0F, 0.0F, 0.0F);
+
+        const XMMATRIX view = XMMatrixLookAtLH(
+            cameraPosition,
+            cameraTarget,
+            cameraUp);
+
+        const float aspectRatio =
+            static_cast<float>(width_) /
+            static_cast<float>(height_);
+
+        const XMMATRIX projection =
+            XMMatrixPerspectiveFovLH(
+                XM_PIDIV4,
+                aspectRatio,
+                0.1F,
+                100.0F);
+
+        const XMMATRIX worldViewProjection =
+            world * view * projection;
+
+        SceneConstants constants{};
+
+        XMStoreFloat4x4(
+            &constants.worldViewProjection,
+            worldViewProjection);
+
+        // 2. CPU에서 계산한 행렬을 GPU Constant Buffer에 복사
+        D3D11_MAPPED_SUBRESOURCE mappedResource{};
+
+        const HRESULT mapResult = deviceContext_->Map(
+            constantBuffer_.Get(),
+            0,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &mappedResource);
+
+        if (FAILED(mapResult))
+        {
+            return;
+        }
+
+        std::memcpy(
+            mappedResource.pData,
+            &constants,
+            sizeof(constants));
+
+        deviceContext_->Unmap(
+            constantBuffer_.Get(),
+            0);
+
+        // 3. Back Buffer를 렌더 타깃으로 연결하고 배경 지우기
         constexpr float backgroundColor[]{
             0.03F,
             0.06F,
@@ -229,8 +355,9 @@ namespace DungeonSync::Rendering
             renderTargetView_.Get(),
             backgroundColor);
 
+        // 4. Vertex Buffer와 Index Buffer 연결
         ID3D11Buffer* vertexBuffers[]{
-        vertexBuffer_.Get()
+            vertexBuffer_.Get()
         };
 
         constexpr UINT stride = sizeof(Vertex);
@@ -243,12 +370,29 @@ namespace DungeonSync::Rendering
             &stride,
             &offset);
 
+        deviceContext_->IASetIndexBuffer(
+            indexBuffer_.Get(),
+            DXGI_FORMAT_R16_UINT,
+            0);
+
+        // 5. 정점 입력 형식과 삼각형 조립 방식 설정
         deviceContext_->IASetInputLayout(
             inputLayout_.Get());
 
         deviceContext_->IASetPrimitiveTopology(
             D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+        // 6. Constant Buffer를 Vertex Shader의 b0 슬롯에 연결
+        ID3D11Buffer* constantBuffers[]{
+            constantBuffer_.Get()
+        };
+
+        deviceContext_->VSSetConstantBuffers(
+            0,
+            1,
+            constantBuffers);
+
+        // 7. Vertex Shader와 Pixel Shader 연결
         deviceContext_->VSSetShader(
             vertexShader_.Get(),
             nullptr,
@@ -259,27 +403,59 @@ namespace DungeonSync::Rendering
             nullptr,
             0);
 
-        deviceContext_->Draw(3, 0);
+        // 8. 인덱스 6개를 이용해 삼각형 2개 그리기
+        deviceContext_->DrawIndexed(
+            static_cast<UINT>(std::size(CubeIndices)),
+            0,
+            0);
 
+        // 9. 완성된 Back Buffer를 창에 표시
         swapChain_->Present(1, 0);
     }
 
-    bool D3D11Renderer::CreateTriangleVertexBuffer()
+    bool D3D11Renderer::CreateCubeGeometryBuffers()
     {
-        D3D11_BUFFER_DESC bufferDescription{};
-        bufferDescription.ByteWidth =
-            static_cast<UINT>(sizeof(TriangleVertices));
+        D3D11_BUFFER_DESC vertexBufferDescription{};
+        vertexBufferDescription.ByteWidth =
+            static_cast<UINT>(sizeof(CubeVertices));
 
-        bufferDescription.Usage = D3D11_USAGE_IMMUTABLE;
-        bufferDescription.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        vertexBufferDescription.Usage =
+            D3D11_USAGE_IMMUTABLE;
 
-        D3D11_SUBRESOURCE_DATA initialData{};
-        initialData.pSysMem = TriangleVertices;
+        vertexBufferDescription.BindFlags =
+            D3D11_BIND_VERTEX_BUFFER;
 
-        const HRESULT result = device_->CreateBuffer(
-            &bufferDescription,
-            &initialData,
+        D3D11_SUBRESOURCE_DATA vertexInitialData{};
+        vertexInitialData.pSysMem = CubeVertices;
+
+        HRESULT result = device_->CreateBuffer(
+            &vertexBufferDescription,
+            &vertexInitialData,
             vertexBuffer_.ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        D3D11_BUFFER_DESC indexBufferDescription{};
+
+        indexBufferDescription.ByteWidth =
+            static_cast<UINT>(sizeof(CubeIndices));
+
+        indexBufferDescription.Usage =
+            D3D11_USAGE_IMMUTABLE;
+
+        indexBufferDescription.BindFlags =
+            D3D11_BIND_INDEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA indexInitialData{};
+        indexInitialData.pSysMem = CubeIndices;
+
+        result = device_->CreateBuffer(
+            &indexBufferDescription,
+            &indexInitialData,
+            indexBuffer_.ReleaseAndGetAddressOf());
 
         return SUCCEEDED(result);
     }
@@ -363,6 +539,25 @@ namespace DungeonSync::Rendering
             vertexShaderBytecode->GetBufferPointer(),
             vertexShaderBytecode->GetBufferSize(),
             inputLayout_.ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::CreateConstantBuffer()
+    {
+        D3D11_BUFFER_DESC bufferDescription{};
+        bufferDescription.ByteWidth = sizeof(SceneConstants);
+        bufferDescription.Usage = D3D11_USAGE_DYNAMIC;
+        bufferDescription.BindFlags =
+            D3D11_BIND_CONSTANT_BUFFER;
+
+        bufferDescription.CPUAccessFlags =
+            D3D11_CPU_ACCESS_WRITE;
+
+        const HRESULT result = device_->CreateBuffer(
+            &bufferDescription,
+            nullptr,
+            constantBuffer_.ReleaseAndGetAddressOf());
 
         return SUCCEEDED(result);
     }
