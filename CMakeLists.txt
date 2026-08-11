@@ -11,7 +11,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(DungeonSyncClient WIN32
     Client/main.cpp
- "Client/Application.cpp" "Client/Platform/Window.cpp" "Client/Platform/Window.h" "Client/Rendering/D3D11Renderer.cpp" "Client/Rendering/D3D11Renderer.h" "Client/Rendering/Vertex.h")
+ "Client/Application.cpp"
+ "Client/Platform/Window.cpp"
+ "Client/Platform/Window.h"
+ "Client/Rendering/D3D11Renderer.cpp"
+ "Client/Rendering/D3D11Renderer.h"
+ "Client/Rendering/Vertex.h"
+ "Client/Presentation/DemoScene.cpp"
+ "Client/Presentation/DemoScene.h"
+)
 
 add_executable(DungeonSyncServer
     Server/main.cpp

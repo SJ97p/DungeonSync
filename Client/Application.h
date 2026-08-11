@@ -2,6 +2,7 @@
 
 #include "Platform/Window.h"
 #include "Rendering/D3D11Renderer.h"
+#include "Presentation/DemoScene.h"
 
 #include <Windows.h>
 
@@ -24,6 +25,7 @@ namespace DungeonSync
     private:
         Platform::Window window_;
         Rendering::D3D11Renderer renderer_;
+        Presentation::DemoScene demoScene_;
 
         int showCommand_{};
     };
