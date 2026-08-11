@@ -6,7 +6,6 @@
 #include <iterator>
 #include <cstddef>
 #include <cstring>
-#include <array>
 
 using Microsoft::WRL::ComPtr;
 
@@ -308,7 +307,8 @@ namespace DungeonSync::Rendering
         return SUCCEEDED(result);
     }
 
-    void D3D11Renderer::Render(float totalSeconds)
+    void D3D11Renderer::Render(
+        std::span<const RenderItem> renderItems)
     {
         using namespace DirectX;
 
@@ -460,31 +460,6 @@ namespace DungeonSync::Rendering
 
                 return true;
             };
-
-        const XMMATRIX nearCubeWorld =
-            XMMatrixRotationX(totalSeconds * 0.7F) *
-            XMMatrixRotationY(totalSeconds);
-
-        const XMMATRIX farCubeWorld =
-            XMMatrixScaling(1.25F, 1.25F, 1.25F) *
-            XMMatrixRotationX(-totalSeconds * 0.4F) *
-            XMMatrixRotationY(-totalSeconds * 0.8F) *
-            XMMatrixTranslation(0.0F, 0.0F, 0.7F);
-        std::array<RenderItem, 2> renderItems{};
-
-        XMStoreFloat4x4(
-            &renderItems[0].world,
-            nearCubeWorld);
-
-        renderItems[0].tintColor =
-            DirectX::XMFLOAT4{ 1.0F, 0.35F, 0.35F, 1.0F };
-
-        XMStoreFloat4x4(
-            &renderItems[1].world,
-            farCubeWorld);
-
-        renderItems[1].tintColor =
-            DirectX::XMFLOAT4{ 0.35F, 0.35F, 1.0F, 1.0F };
 
         for (const RenderItem& item : renderItems)
         {

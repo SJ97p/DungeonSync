@@ -1,6 +1,10 @@
 #include "Application.h"
+#include "Rendering/RenderItem.h"
+
 #include <chrono>
 #include <cstdlib>
+#include <DirectXMath.h>
+#include <array>
 
 namespace
 {
@@ -58,7 +62,55 @@ namespace DungeonSync
             const std::chrono::duration<float> elapsed =
                 currentTime - startTime;
 
-            renderer_.Render(elapsed.count());
+            const float totalSeconds = elapsed.count();
+
+            const DirectX::XMMATRIX nearCubeWorld =
+                DirectX::XMMatrixRotationX(
+                    totalSeconds * 0.7F) *
+                DirectX::XMMatrixRotationY(
+                    totalSeconds);
+
+            const DirectX::XMMATRIX farCubeWorld =
+                DirectX::XMMatrixScaling(
+                    1.25F,
+                    1.25F,
+                    1.25F) *
+                DirectX::XMMatrixRotationX(
+                    -totalSeconds * 0.4F) *
+                DirectX::XMMatrixRotationY(
+                    -totalSeconds * 0.8F) *
+                DirectX::XMMatrixTranslation(
+                    0.0F,
+                    0.0F,
+                    0.7F);
+
+            std::array<Rendering::RenderItem, 2> renderItems{};
+
+            DirectX::XMStoreFloat4x4(
+                &renderItems[0].world,
+                nearCubeWorld);
+
+            renderItems[0].tintColor =
+                DirectX::XMFLOAT4{
+                    1.0F,
+                    0.35F,
+                    0.35F,
+                    1.0F
+            };
+
+            DirectX::XMStoreFloat4x4(
+                &renderItems[1].world,
+                farCubeWorld);
+
+            renderItems[1].tintColor =
+                DirectX::XMFLOAT4{
+                    0.35F,
+                    0.35F,
+                    1.0F,
+                    1.0F
+            };
+
+            renderer_.Render(renderItems);
         }
 
         return EXIT_SUCCESS;

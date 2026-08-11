@@ -1,10 +1,11 @@
 #pragma once
+#include "RenderItem.h"
 
 #include <Windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
 #include <wrl/client.h>
-
+#include <span>
 #include <cstdint>
 
 namespace DungeonSync::Rendering
@@ -25,7 +26,8 @@ namespace DungeonSync::Rendering
             std::uint32_t width,
             std::uint32_t height);
 
-        void Render(float totalSeconds);
+        void Render(
+            std::span<const RenderItem> renderItems);
 
     private:
         [[nodiscard]] bool CreateDeviceAndSwapChain(
