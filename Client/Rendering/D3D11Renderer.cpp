@@ -144,6 +144,11 @@ namespace DungeonSync::Rendering
             return false;
         }
 
+        if (!CreateDepthBuffer())
+        {
+            return false;
+        }
+
         if (!CreateCubeGeometryBuffers())
         {
             return false;
@@ -267,6 +272,39 @@ namespace DungeonSync::Rendering
         return SUCCEEDED(result);
     }
 
+    bool D3D11Renderer::CreateDepthBuffer()
+    {
+        D3D11_TEXTURE2D_DESC textureDescription{};
+        textureDescription.Width = width_;
+        textureDescription.Height = height_;
+        textureDescription.MipLevels = 1;
+        textureDescription.ArraySize = 1;
+        textureDescription.Format =
+            DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+        textureDescription.SampleDesc.Count = 1;
+        textureDescription.Usage = D3D11_USAGE_DEFAULT;
+        textureDescription.BindFlags =
+            D3D11_BIND_DEPTH_STENCIL;
+
+        HRESULT result = device_->CreateTexture2D(
+            &textureDescription,
+            nullptr,
+            depthBuffer_.ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        result = device_->CreateDepthStencilView(
+            depthBuffer_.Get(),
+            nullptr,
+            depthStencilView_.ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
     void D3D11Renderer::Render(float totalSeconds)
     {
         using namespace DirectX;
@@ -349,11 +387,18 @@ namespace DungeonSync::Rendering
         deviceContext_->OMSetRenderTargets(
             1,
             renderTargets,
-            nullptr);
+            //nullptr);
+            depthStencilView_.Get());
 
         deviceContext_->ClearRenderTargetView(
             renderTargetView_.Get(),
             backgroundColor);
+
+        deviceContext_->ClearDepthStencilView(
+            depthStencilView_.Get(),
+            D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+            1.0F,
+            0);
 
         // 4. Vertex Buffer와 Index Buffer 연결
         ID3D11Buffer* vertexBuffers[]{

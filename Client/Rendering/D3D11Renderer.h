@@ -34,6 +34,7 @@ namespace DungeonSync::Rendering
             std::uint32_t height);
 
         [[nodiscard]] bool CreateRenderTarget();
+        [[nodiscard]] bool CreateDepthBuffer();
         [[nodiscard]] bool CreateCubeGeometryBuffers();
         [[nodiscard]] bool CreateShadersAndInputLayout();
         [[nodiscard]] bool CreateConstantBuffer();
@@ -42,6 +43,8 @@ namespace DungeonSync::Rendering
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> deviceContext_;
         Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain_;
         Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTargetView_;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> depthBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthStencilView_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer_;
         Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
