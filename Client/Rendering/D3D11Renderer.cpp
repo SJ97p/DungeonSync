@@ -1,8 +1,68 @@
 #include "D3D11Renderer.h"
-
+#include <d3dcompiler.h>
+#include "Vertex.h"
 #include <iterator>
+#include <cstddef>
 
 using Microsoft::WRL::ComPtr;
+
+
+namespace
+{
+    const DungeonSync::Rendering::Vertex TriangleVertices[]{
+        {
+            { 0.0F, 0.5F, 0.0F },
+            { 1.0F, 0.0F, 0.0F, 1.0F }
+        },
+        {
+            { 0.5F, -0.5F, 0.0F },
+            { 0.0F, 1.0F, 0.0F, 1.0F }
+        },
+        {
+            { -0.5F, -0.5F, 0.0F },
+            { 0.0F, 0.0F, 1.0F, 1.0F }
+        }
+    };
+
+    HRESULT CompileShader(
+        const wchar_t* filePath,
+        const char* entryPoint,
+        const char* target,
+        ComPtr<ID3DBlob>& bytecode)
+    {
+        UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+
+#ifdef _DEBUG
+        compileFlags |= D3DCOMPILE_DEBUG;
+        compileFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+        compileFlags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+#endif
+
+        ComPtr<ID3DBlob> diagnostics;
+
+        const HRESULT result = D3DCompileFromFile(
+            filePath,
+            nullptr,
+            D3D_COMPILE_STANDARD_FILE_INCLUDE,
+            entryPoint,
+            target,
+            compileFlags,
+            0,
+            bytecode.ReleaseAndGetAddressOf(),
+            diagnostics.ReleaseAndGetAddressOf());
+
+        if (diagnostics != nullptr)
+        {
+            const auto* message = static_cast<const char*>(
+                diagnostics->GetBufferPointer());
+
+            OutputDebugStringA(message);
+        }
+
+        return result;
+    }
+}
 
 namespace DungeonSync::Rendering
 {
@@ -25,6 +85,16 @@ namespace DungeonSync::Rendering
         }
 
         if (!CreateRenderTarget())
+        {
+            return false;
+        }
+
+        if (!CreateTriangleVertexBuffer())
+        {
+            return false;
+        }
+
+        if (!CreateShadersAndInputLayout())
         {
             return false;
         }
@@ -159,6 +229,141 @@ namespace DungeonSync::Rendering
             renderTargetView_.Get(),
             backgroundColor);
 
+        ID3D11Buffer* vertexBuffers[]{
+        vertexBuffer_.Get()
+        };
+
+        constexpr UINT stride = sizeof(Vertex);
+        constexpr UINT offset = 0;
+
+        deviceContext_->IASetVertexBuffers(
+            0,
+            1,
+            vertexBuffers,
+            &stride,
+            &offset);
+
+        deviceContext_->IASetInputLayout(
+            inputLayout_.Get());
+
+        deviceContext_->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        deviceContext_->VSSetShader(
+            vertexShader_.Get(),
+            nullptr,
+            0);
+
+        deviceContext_->PSSetShader(
+            pixelShader_.Get(),
+            nullptr,
+            0);
+
+        deviceContext_->Draw(3, 0);
+
         swapChain_->Present(1, 0);
+    }
+
+    bool D3D11Renderer::CreateTriangleVertexBuffer()
+    {
+        D3D11_BUFFER_DESC bufferDescription{};
+        bufferDescription.ByteWidth =
+            static_cast<UINT>(sizeof(TriangleVertices));
+
+        bufferDescription.Usage = D3D11_USAGE_IMMUTABLE;
+        bufferDescription.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA initialData{};
+        initialData.pSysMem = TriangleVertices;
+
+        const HRESULT result = device_->CreateBuffer(
+            &bufferDescription,
+            &initialData,
+            vertexBuffer_.ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::CreateShadersAndInputLayout()
+    {
+        constexpr wchar_t ShaderPath[] =
+            L"Client/Rendering/Shaders/Triangle.hlsl";
+
+        ComPtr<ID3DBlob> vertexShaderBytecode;
+        ComPtr<ID3DBlob> pixelShaderBytecode;
+
+        HRESULT result = CompileShader(
+            ShaderPath,
+            "VSMain",
+            "vs_5_0",
+            vertexShaderBytecode);
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        result = CompileShader(
+            ShaderPath,
+            "PSMain",
+            "ps_5_0",
+            pixelShaderBytecode);
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        result = device_->CreateVertexShader(
+            vertexShaderBytecode->GetBufferPointer(),
+            vertexShaderBytecode->GetBufferSize(),
+            nullptr,
+            vertexShader_.ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        result = device_->CreatePixelShader(
+            pixelShaderBytecode->GetBufferPointer(),
+            pixelShaderBytecode->GetBufferSize(),
+            nullptr,
+            pixelShader_.ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        const D3D11_INPUT_ELEMENT_DESC inputElements[]{
+            {
+                "POSITION",
+                0,
+                DXGI_FORMAT_R32G32B32_FLOAT,
+                0,
+                static_cast<UINT>(offsetof(Vertex, position)),
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0
+            },
+            {
+                "COLOR",
+                0,
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                0,
+                static_cast<UINT>(offsetof(Vertex, color)),
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0
+            }
+        };
+
+        result = device_->CreateInputLayout(
+            inputElements,
+            static_cast<UINT>(std::size(inputElements)),
+            vertexShaderBytecode->GetBufferPointer(),
+            vertexShaderBytecode->GetBufferSize(),
+            inputLayout_.ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
     }
 }

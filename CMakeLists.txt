@@ -11,7 +11,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(DungeonSyncClient WIN32
     Client/main.cpp
- "Client/Application.cpp" "Client/Platform/Window.cpp" "Client/Platform/Window.h" "Client/Rendering/D3D11Renderer.cpp" "Client/Rendering/D3D11Renderer.h")
+ "Client/Application.cpp" "Client/Platform/Window.cpp" "Client/Platform/Window.h" "Client/Rendering/D3D11Renderer.cpp" "Client/Rendering/D3D11Renderer.h" "Client/Rendering/Vertex.h")
 
 add_executable(DungeonSyncServer
     Server/main.cpp
@@ -20,6 +20,24 @@ add_executable(DungeonSyncServer
 target_link_libraries(DungeonSyncClient PRIVATE
     d3d11
     dxgi
+    d3dcompiler
+)
+
+set(TriangleShader
+    Client/Rendering/Shaders/Triangle.hlsl
+)
+
+set_source_files_properties(
+    ${TriangleShader}
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
+
+target_sources(DungeonSyncClient PRIVATE
+    ${TriangleShader}
+)
+
+set_target_properties(DungeonSyncClient PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
 )
 
 foreach(target DungeonSyncClient DungeonSyncServer)

@@ -34,11 +34,17 @@ namespace DungeonSync::Rendering
             std::uint32_t height);
 
         [[nodiscard]] bool CreateRenderTarget();
+        [[nodiscard]] bool CreateTriangleVertexBuffer();
+        [[nodiscard]] bool CreateShadersAndInputLayout();
 
         Microsoft::WRL::ComPtr<ID3D11Device> device_;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> deviceContext_;
         Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain_;
         Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTargetView_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
+        Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
 
         D3D_FEATURE_LEVEL featureLevel_{};
 
