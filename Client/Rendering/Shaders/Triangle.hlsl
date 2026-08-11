@@ -1,6 +1,7 @@
-cbuffer SceneConstants : register(b0)
+cbuffer ObjectConstants : register(b0)
 {
     row_major float4x4 worldViewProjection;
+    float4 tintColor;
 };
 
 struct VertexInput
@@ -22,7 +23,7 @@ VertexOutput VSMain(VertexInput input)
     output.position = mul(
         float4(input.position, 1.0F),
         worldViewProjection);
-    output.color = input.color;
+    output.color = input.color * tintColor;
 
     return output;
 }

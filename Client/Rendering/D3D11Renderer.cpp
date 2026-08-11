@@ -2,9 +2,11 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include "Vertex.h"
+#include "RenderItem.h"
 #include <iterator>
 #include <cstddef>
 #include <cstring>
+#include <array>
 
 using Microsoft::WRL::ComPtr;
 
@@ -72,12 +74,13 @@ namespace
         4, 3, 7
     };
 
-    struct alignas(16) SceneConstants
+    struct alignas(16) ObjectConstants
     {
         DirectX::XMFLOAT4X4 worldViewProjection;
+        DirectX::XMFLOAT4 tintColor;
     };
 
-    static_assert(sizeof(SceneConstants) % 16 == 0);
+    static_assert(sizeof(ObjectConstants) % 16 == 0);
 
     HRESULT CompileShader(
         const wchar_t* filePath,
@@ -309,13 +312,8 @@ namespace DungeonSync::Rendering
     {
         using namespace DirectX;
 
-        // 1. CPU에서 월드·뷰·투영 행렬 계산
-        const XMMATRIX world =
-            XMMatrixRotationX(totalSeconds * 0.7F) *
-            XMMatrixRotationY(totalSeconds);
-
         const XMVECTOR cameraPosition =
-            XMVectorSet(0.0F, 0.0F, -2.0F, 1.0F);
+            XMVectorSet(0.0F, 0.0F, -3.0F, 1.0F);
 
         const XMVECTOR cameraTarget =
             XMVectorZero();
@@ -338,39 +336,6 @@ namespace DungeonSync::Rendering
                 aspectRatio,
                 0.1F,
                 100.0F);
-
-        const XMMATRIX worldViewProjection =
-            world * view * projection;
-
-        SceneConstants constants{};
-
-        XMStoreFloat4x4(
-            &constants.worldViewProjection,
-            worldViewProjection);
-
-        // 2. CPU에서 계산한 행렬을 GPU Constant Buffer에 복사
-        D3D11_MAPPED_SUBRESOURCE mappedResource{};
-
-        const HRESULT mapResult = deviceContext_->Map(
-            constantBuffer_.Get(),
-            0,
-            D3D11_MAP_WRITE_DISCARD,
-            0,
-            &mappedResource);
-
-        if (FAILED(mapResult))
-        {
-            return;
-        }
-
-        std::memcpy(
-            mappedResource.pData,
-            &constants,
-            sizeof(constants));
-
-        deviceContext_->Unmap(
-            constantBuffer_.Get(),
-            0);
 
         // 3. Back Buffer를 렌더 타깃으로 연결하고 배경 지우기
         constexpr float backgroundColor[]{
@@ -448,11 +413,86 @@ namespace DungeonSync::Rendering
             nullptr,
             0);
 
-        // 8. 인덱스 6개를 이용해 삼각형 2개 그리기
-        deviceContext_->DrawIndexed(
-            static_cast<UINT>(std::size(CubeIndices)),
-            0,
-            0);
+        const auto drawCube =
+            [&](const RenderItem& item) -> bool
+            {
+                const XMMATRIX world =
+                    XMLoadFloat4x4(&item.world);
+
+                const XMMATRIX worldViewProjection =
+                    world * view * projection;
+
+                ObjectConstants constants{};
+
+                XMStoreFloat4x4(
+                    &constants.worldViewProjection,
+                    worldViewProjection);
+                
+                constants.tintColor = item.tintColor;
+
+                D3D11_MAPPED_SUBRESOURCE mappedResource{};
+
+                const HRESULT mapResult = deviceContext_->Map(
+                    constantBuffer_.Get(),
+                    0,
+                    D3D11_MAP_WRITE_DISCARD,
+                    0,
+                    &mappedResource);
+
+                if (FAILED(mapResult))
+                {
+                    return false;
+                }
+
+                std::memcpy(
+                    mappedResource.pData,
+                    &constants,
+                    sizeof(constants));
+
+                deviceContext_->Unmap(
+                    constantBuffer_.Get(),
+                    0);
+
+                deviceContext_->DrawIndexed(
+                    static_cast<UINT>(std::size(CubeIndices)),
+                    0,
+                    0);
+
+                return true;
+            };
+
+        const XMMATRIX nearCubeWorld =
+            XMMatrixRotationX(totalSeconds * 0.7F) *
+            XMMatrixRotationY(totalSeconds);
+
+        const XMMATRIX farCubeWorld =
+            XMMatrixScaling(1.25F, 1.25F, 1.25F) *
+            XMMatrixRotationX(-totalSeconds * 0.4F) *
+            XMMatrixRotationY(-totalSeconds * 0.8F) *
+            XMMatrixTranslation(0.0F, 0.0F, 0.7F);
+        std::array<RenderItem, 2> renderItems{};
+
+        XMStoreFloat4x4(
+            &renderItems[0].world,
+            nearCubeWorld);
+
+        renderItems[0].tintColor =
+            DirectX::XMFLOAT4{ 1.0F, 0.35F, 0.35F, 1.0F };
+
+        XMStoreFloat4x4(
+            &renderItems[1].world,
+            farCubeWorld);
+
+        renderItems[1].tintColor =
+            DirectX::XMFLOAT4{ 0.35F, 0.35F, 1.0F, 1.0F };
+
+        for (const RenderItem& item : renderItems)
+        {
+            if (!drawCube(item))
+            {
+                return;
+            }
+        }
 
         // 9. 완성된 Back Buffer를 창에 표시
         swapChain_->Present(1, 0);
@@ -591,7 +631,7 @@ namespace DungeonSync::Rendering
     bool D3D11Renderer::CreateConstantBuffer()
     {
         D3D11_BUFFER_DESC bufferDescription{};
-        bufferDescription.ByteWidth = sizeof(SceneConstants);
+        bufferDescription.ByteWidth = sizeof(ObjectConstants);
         bufferDescription.Usage = D3D11_USAGE_DYNAMIC;
         bufferDescription.BindFlags =
             D3D11_BIND_CONSTANT_BUFFER;
