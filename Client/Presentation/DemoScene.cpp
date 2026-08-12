@@ -77,43 +77,14 @@ namespace DungeonSync::Presentation
         if (attackPressed)
         {
             constexpr float AttackRange = 0.75F;
-            constexpr float AttackRangeSquared =
-                AttackRange * AttackRange;
-
             constexpr float AttackDamage = 50.0F;
 
-            for (Gameplay::Monster& monster : monsters_)
-            {
-                if (!monster.alive)
-                {
-                    continue;
-                }
-
-                const float differenceX =
-                    monster.position.x - playerPosition_.x;
-
-                const float differenceY =
-                    monster.position.y - playerPosition_.y;
-
-                const float distanceSquared =
-                    differenceX * differenceX +
-                    differenceY * differenceY;
-
-                if (distanceSquared >
-                    AttackRangeSquared)
-                {
-                    continue;
-                }
-
-                monster.health = std::max(
-                    0.0F,
-                    monster.health - AttackDamage);
-
-                if (monster.health <= 0.0F)
-                {
-                    monster.alive = false;
-                }
-            }
+            lastAttackHitCount_ =
+                combatSystem_.ApplyAreaAttack(
+                    playerPosition_,
+                    AttackRange,
+                    AttackDamage,
+                    monsters_);
         }
 
         camera_.position = DirectX::XMFLOAT3{

@@ -3,6 +3,7 @@
 #include "../Rendering/RenderItem.h"
 #include "../Rendering/Camera.h"
 #include "../Gameplay/Monster.h"
+#include "../Gameplay/CombatSystem.h"
 
 #include <DirectXMath.h>
 #include <array>
@@ -35,6 +36,8 @@ namespace DungeonSync::Presentation
 
         std::array<Gameplay::Monster, MonsterCount>
             monsters_{};
+        Gameplay::CombatSystem combatSystem_{};
+        std::size_t lastAttackHitCount_{};
 
         std::array<
             Rendering::RenderItem,
