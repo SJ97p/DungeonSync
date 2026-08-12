@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <cstdio>
 
 namespace
 {
@@ -51,6 +52,9 @@ namespace DungeonSync
 
         auto previousTime =
             std::chrono::steady_clock::now();
+
+        float statisticsElapsedSeconds = 0.0F;
+        std::size_t statisticsFrameCount = 0;
 
         bool spaceWasDown = false;
 
@@ -116,6 +120,38 @@ namespace DungeonSync
             renderer_.Render(
                 demoScene_.GetCamera(),
                 demoScene_.RenderItems());
+
+            statisticsElapsedSeconds +=
+                frameElapsed.count();
+
+            ++statisticsFrameCount;
+
+            if (statisticsElapsedSeconds >= 1.0F)
+            {
+                const float framesPerSecond =
+                    static_cast<float>(
+                        statisticsFrameCount) /
+                    statisticsElapsedSeconds;
+
+                const Rendering::RenderStatistics& statistics =
+                    renderer_.Statistics();
+
+                char message[256]{};
+
+                std::snprintf(
+                    message,
+                    sizeof(message),
+                    "Render - FPS: %.1f, Draw Calls: %zu, Instances: %zu\n",
+                    framesPerSecond,
+                    statistics.drawCallCount,
+                    statistics.instanceCount);
+
+                OutputDebugStringA(message);
+
+                statisticsElapsedSeconds = 0.0F;
+                statisticsFrameCount = 0;
+            }
+
         }
 
         return EXIT_SUCCESS;

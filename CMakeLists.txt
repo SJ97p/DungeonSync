@@ -26,7 +26,7 @@ add_executable(DungeonSyncClient WIN32
  "Client/Gameplay/SpatialGrid.h" 
  "Client/Gameplay/SpatialGrid.cpp" 
  "Client/Rendering/InstanceData.h"
-)
+ "Client/Rendering/RenderStatistics.h")
 
 add_executable(DungeonSyncServer
     Server/main.cpp

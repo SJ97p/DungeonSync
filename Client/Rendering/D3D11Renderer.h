@@ -2,6 +2,7 @@
 #include "RenderItem.h"
 #include "Camera.h"
 #include "InstanceData.h"
+#include "RenderStatistics.h"
 
 #include <Windows.h>
 #include <d3d11.h>
@@ -28,6 +29,10 @@ namespace DungeonSync::Rendering
             HWND window,
             std::uint32_t width,
             std::uint32_t height);
+
+        [[nodiscard]]
+        const RenderStatistics&
+            Statistics() const noexcept;
 
         void Render(
             const Camera& camera,
@@ -63,6 +68,7 @@ namespace DungeonSync::Rendering
         D3D_FEATURE_LEVEL featureLevel_{};
 
         static constexpr std::size_t MaxInstanceCount = 1024;
+        RenderStatistics statistics_{};
         std::uint32_t width_{};
         std::uint32_t height_{};
     };

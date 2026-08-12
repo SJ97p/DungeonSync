@@ -317,6 +317,7 @@ namespace DungeonSync::Rendering
         std::span<const RenderItem> renderItems)
     {
         using namespace DirectX;
+        statistics_ = {};
 
         const XMVECTOR cameraPosition =
             XMLoadFloat3(&camera.position);
@@ -380,6 +381,9 @@ namespace DungeonSync::Rendering
             std::min(
                 renderItems.size(),
                 MaxInstanceCount);
+
+        statistics_.instanceCount =
+            instanceCount;
 
         if (instanceCount == 0)
         {
@@ -545,9 +549,16 @@ namespace DungeonSync::Rendering
             0,
             0,
             0);
+        ++statistics_.drawCallCount;
 
         // 9. 완성된 Back Buffer를 창에 표시
         swapChain_->Present(1, 0);
+    }
+
+    const RenderStatistics&
+        D3D11Renderer::Statistics() const noexcept
+    {
+        return statistics_;
     }
 
     bool D3D11Renderer::CreateCubeGeometryBuffers()
