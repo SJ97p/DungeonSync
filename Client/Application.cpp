@@ -48,25 +48,19 @@ namespace DungeonSync
 
             return EXIT_FAILURE;
         }
-        const auto startTime =
-            std::chrono::steady_clock::now();
 
-        auto previousTime = startTime;
+        auto previousTime =
+            std::chrono::steady_clock::now();
 
         while (window_.ProcessMessages())
         {
             const auto currentTime =
                 std::chrono::steady_clock::now();
 
-            const std::chrono::duration<float> elapsed =
-                currentTime - startTime;
-
             const std::chrono::duration<float> frameElapsed =
                 currentTime - previousTime;
 
             previousTime = currentTime;
-
-            const float totalSeconds = elapsed.count();
 
             float moveX = 0.0F;
             float moveY = 0.0F;
@@ -104,7 +98,6 @@ namespace DungeonSync
             }
 
             demoScene_.Update(
-                totalSeconds,
                 frameElapsed.count(),
                 moveX,
                 moveY);

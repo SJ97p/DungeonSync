@@ -6,6 +6,7 @@
 #include <DirectXMath.h>
 #include <array>
 #include <span>
+#include <cstddef>
 
 namespace DungeonSync::Presentation
 {
@@ -15,7 +16,6 @@ namespace DungeonSync::Presentation
         DemoScene();
 
         void Update(
-            float totalSeconds,
             float deltaSeconds,
             float moveX,
             float moveY);
@@ -27,8 +27,18 @@ namespace DungeonSync::Presentation
             RenderItems() const noexcept;
 
     private:
+        static constexpr std::size_t MonsterCount = 5;
+
         DirectX::XMFLOAT2 playerPosition_{};
-        std::array<Rendering::RenderItem, 2> renderItems_{};
+
+        std::array<DirectX::XMFLOAT2, MonsterCount>
+            monsterPositions_{};
+
+        std::array<
+            Rendering::RenderItem,
+            1 + MonsterCount>
+            renderItems_{};
+
         Rendering::Camera camera_{};
     };
 }
