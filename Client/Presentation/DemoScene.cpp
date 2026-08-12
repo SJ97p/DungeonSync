@@ -15,12 +15,22 @@ namespace DungeonSync::Presentation
                 1.0F
         };
 
-        monsterPositions_ = {
-            DirectX::XMFLOAT2{ -1.2F,  0.6F },
-            DirectX::XMFLOAT2{  0.0F,  0.7F },
-            DirectX::XMFLOAT2{  1.2F,  0.6F },
-            DirectX::XMFLOAT2{ -0.8F, -0.6F },
-            DirectX::XMFLOAT2{  0.8F, -0.6F }
+        monsters_ = {
+            Gameplay::Monster{
+                DirectX::XMFLOAT2{ -1.2F,  0.6F }
+            },
+            Gameplay::Monster{
+                DirectX::XMFLOAT2{  0.0F,  0.7F }
+            },
+            Gameplay::Monster{
+                DirectX::XMFLOAT2{  1.2F,  0.6F }
+            },
+            Gameplay::Monster{
+                DirectX::XMFLOAT2{ -0.8F, -0.6F }
+            },
+            Gameplay::Monster{
+                DirectX::XMFLOAT2{  0.8F, -0.6F }
+            }
         };
 
         for (std::size_t index = 0;
@@ -40,7 +50,8 @@ namespace DungeonSync::Presentation
     void DemoScene::Update(
         float deltaSeconds,
         float moveX,
-        float moveY)
+        float moveY,
+        bool attackPressed)
     {
         constexpr float PlayerMoveSpeed = 1.5F;
 
@@ -62,6 +73,48 @@ namespace DungeonSync::Presentation
             playerPosition_.y,
             -MovementLimitY,
             MovementLimitY);
+
+        if (attackPressed)
+        {
+            constexpr float AttackRange = 0.75F;
+            constexpr float AttackRangeSquared =
+                AttackRange * AttackRange;
+
+            constexpr float AttackDamage = 50.0F;
+
+            for (Gameplay::Monster& monster : monsters_)
+            {
+                if (!monster.alive)
+                {
+                    continue;
+                }
+
+                const float differenceX =
+                    monster.position.x - playerPosition_.x;
+
+                const float differenceY =
+                    monster.position.y - playerPosition_.y;
+
+                const float distanceSquared =
+                    differenceX * differenceX +
+                    differenceY * differenceY;
+
+                if (distanceSquared >
+                    AttackRangeSquared)
+                {
+                    continue;
+                }
+
+                monster.health = std::max(
+                    0.0F,
+                    monster.health - AttackDamage);
+
+                if (monster.health <= 0.0F)
+                {
+                    monster.alive = false;
+                }
+            }
+        }
 
         camera_.position = DirectX::XMFLOAT3{
     playerPosition_.x,
@@ -93,8 +146,37 @@ namespace DungeonSync::Presentation
             index < MonsterCount;
             ++index)
         {
+            const Gameplay::Monster& monster =
+                monsters_[index];
+
+            Rendering::RenderItem& renderItem =
+                renderItems_[index + 1];
+
+            if (!monster.alive)
+            {
+                const DirectX::XMMATRIX hiddenWorld =
+                    DirectX::XMMatrixScaling(
+                        0.0F,
+                        0.0F,
+                        0.0F);
+
+                DirectX::XMStoreFloat4x4(
+                    &renderItem.world,
+                    hiddenWorld);
+
+                renderItem.tintColor =
+                    DirectX::XMFLOAT4{
+                        0.0F,
+                        0.0F,
+                        0.0F,
+                        0.0F
+                };
+
+                continue;
+            }
+
             const DirectX::XMFLOAT2& monsterPosition =
-                monsterPositions_[index];
+                monster.position;
 
             const DirectX::XMMATRIX monsterWorld =
                 DirectX::XMMatrixScaling(
@@ -107,8 +189,29 @@ namespace DungeonSync::Presentation
                     0.0F);
 
             DirectX::XMStoreFloat4x4(
-                &renderItems_[index + 1].world,
+                &renderItem.world,
                 monsterWorld);
+
+            if (monster.health < 100.0F)
+            {
+                renderItem.tintColor =
+                    DirectX::XMFLOAT4{
+                        1.0F,
+                        0.8F,
+                        0.2F,
+                        1.0F
+                };
+            }
+            else
+            {
+                renderItem.tintColor =
+                    DirectX::XMFLOAT4{
+                        0.25F,
+                        0.45F,
+                        1.0F,
+                        1.0F
+                };
+            }
         }
     }
 

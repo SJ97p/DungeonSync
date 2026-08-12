@@ -2,6 +2,7 @@
 
 #include "../Rendering/RenderItem.h"
 #include "../Rendering/Camera.h"
+#include "../Gameplay/Monster.h"
 
 #include <DirectXMath.h>
 #include <array>
@@ -18,7 +19,8 @@ namespace DungeonSync::Presentation
         void Update(
             float deltaSeconds,
             float moveX,
-            float moveY);
+            float moveY,
+            bool attackPressed);
         [[nodiscard]]
         const Rendering::Camera& GetCamera() const noexcept;
 
@@ -31,8 +33,8 @@ namespace DungeonSync::Presentation
 
         DirectX::XMFLOAT2 playerPosition_{};
 
-        std::array<DirectX::XMFLOAT2, MonsterCount>
-            monsterPositions_{};
+        std::array<Gameplay::Monster, MonsterCount>
+            monsters_{};
 
         std::array<
             Rendering::RenderItem,

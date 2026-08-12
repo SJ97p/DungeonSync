@@ -20,6 +20,7 @@ add_executable(DungeonSyncClient WIN32
  "Client/Presentation/DemoScene.cpp"
  "Client/Presentation/DemoScene.h"
  "Client/Rendering/Camera.h"
+ "Client/Gameplay/Monster.h"
 )
 
 add_executable(DungeonSyncServer

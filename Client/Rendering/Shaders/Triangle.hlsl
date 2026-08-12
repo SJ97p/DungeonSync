@@ -23,7 +23,8 @@ VertexOutput VSMain(VertexInput input)
     output.position = mul(
         float4(input.position, 1.0F),
         worldViewProjection);
-    output.color = input.color * tintColor;
+
+    output.color = tintColor;
 
     return output;
 }

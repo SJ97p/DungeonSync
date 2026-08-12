@@ -52,6 +52,8 @@ namespace DungeonSync
         auto previousTime =
             std::chrono::steady_clock::now();
 
+        bool spaceWasDown = false;
+
         while (window_.ProcessMessages())
         {
             const auto currentTime =
@@ -97,10 +99,19 @@ namespace DungeonSync
                 moveY *= DiagonalNormalizer;
             }
 
+            const bool spaceIsDown =
+                (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+
+            const bool attackPressed =
+                spaceIsDown && !spaceWasDown;
+
+            spaceWasDown = spaceIsDown;
+
             demoScene_.Update(
                 frameElapsed.count(),
                 moveX,
-                moveY);
+                moveY,
+                attackPressed);
 
             renderer_.Render(
                 demoScene_.GetCamera(),
