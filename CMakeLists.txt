@@ -11,31 +11,45 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(DungeonSyncClient WIN32
     Client/main.cpp
- "Client/Application.cpp"
- "Client/Platform/Window.cpp"
- "Client/Platform/Window.h"
- "Client/Rendering/D3D11Renderer.cpp"
- "Client/Rendering/D3D11Renderer.h"
- "Client/Rendering/Vertex.h"
- "Client/Presentation/DemoScene.cpp"
- "Client/Presentation/DemoScene.h"
- "Client/Rendering/Camera.h"
- "Client/Gameplay/Monster.h"
- "Client/Gameplay/CombatSystem.cpp"
- "Client/Gameplay/CombatSystem.h"
- "Client/Gameplay/SpatialGrid.h" 
- "Client/Gameplay/SpatialGrid.cpp" 
- "Client/Rendering/InstanceData.h"
- "Client/Rendering/RenderStatistics.h")
+    Client/Application.cpp
+    Client/Platform/Window.cpp
+    Client/Platform/Window.h
+    Client/Rendering/D3D11Renderer.cpp
+    Client/Rendering/D3D11Renderer.h
+    Client/Rendering/Vertex.h
+    Client/Presentation/DemoScene.cpp
+    Client/Presentation/DemoScene.h
+    Client/Rendering/Camera.h
+    Client/Gameplay/Monster.h
+    Client/Gameplay/CombatSystem.cpp
+    Client/Gameplay/CombatSystem.h
+    Client/Gameplay/SpatialGrid.h
+    Client/Gameplay/SpatialGrid.cpp
+    Client/Rendering/InstanceData.h
+    Client/Rendering/RenderStatistics.h
+    Client/Network/TcpClient.cpp
+    Client/Network/TcpClient.h
+    Shared/Network/WinsockRuntime.cpp
+    Shared/Network/WinsockRuntime.h
+)
 
 add_executable(DungeonSyncServer
     Server/main.cpp
+    Shared/Network/WinsockRuntime.cpp
+    Shared/Network/WinsockRuntime.h
+    Server/Network/TcpListener.cpp
+    Server/Network/TcpListener.h
 )
 
 target_link_libraries(DungeonSyncClient PRIVATE
     d3d11
     dxgi
     d3dcompiler
+    ws2_32
+)
+
+target_link_libraries(DungeonSyncServer PRIVATE
+    ws2_32
 )
 
 set(TriangleShader

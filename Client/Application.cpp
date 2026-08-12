@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstdio>
+#include <cstdint>
 
 namespace
 {
@@ -25,6 +26,63 @@ namespace DungeonSync
 
     int Application::Run()
     {
+        if (!winsock_.IsInitialized())
+        {
+            MessageBoxW(
+                nullptr,
+                L"Failed to initialize Winsock.",
+                L"DungeonSync Network Error",
+                MB_OK | MB_ICONERROR);
+
+            return EXIT_FAILURE;
+        }
+
+        constexpr std::uint16_t ServerPort = 27015;
+
+        if (!tcpClient_.Connect(
+            "127.0.0.1",
+            ServerPort))
+        {
+            char message[128]{};
+
+            std::snprintf(
+                message,
+                sizeof(message),
+                "Failed to connect to server. Error: %d\n",
+                tcpClient_.ErrorCode());
+
+            OutputDebugStringA(message);
+
+            MessageBoxW(
+                nullptr,
+                L"Failed to connect to DungeonSync Server.",
+                L"DungeonSync Network Error",
+                MB_OK | MB_ICONERROR);
+
+            return EXIT_FAILURE;
+        }
+
+        OutputDebugStringA(
+            "Connected to DungeonSync Server.\n");
+
+        if (!tcpClient_.Send("HELLO"))
+        {
+            char message[128]{};
+
+            std::snprintf(
+                message,
+                sizeof(message),
+                "Failed to send HELLO. Error: %d\n",
+                tcpClient_.ErrorCode());
+
+            OutputDebugStringA(message);
+
+            return EXIT_FAILURE;
+        }
+
+        OutputDebugStringA(
+            "Sent HELLO to DungeonSync Server.\n");
+
         if (!window_.Initialize(showCommand_))
         {
             MessageBoxW(

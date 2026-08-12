@@ -3,7 +3,10 @@
 #include "Platform/Window.h"
 #include "Rendering/D3D11Renderer.h"
 #include "Presentation/DemoScene.h"
+#include "Network/TcpClient.h"
+#include "../Shared/Network/WinsockRuntime.h"
 
+#include <WinSock2.h>
 #include <Windows.h>
 
 namespace DungeonSync
@@ -23,6 +26,9 @@ namespace DungeonSync
         Application& operator=(Application&&) = delete;
 
     private:
+        Network::WinsockRuntime winsock_;
+        Network::TcpClient tcpClient_;
+
         Platform::Window window_;
         Rendering::D3D11Renderer renderer_;
         Presentation::DemoScene demoScene_;
