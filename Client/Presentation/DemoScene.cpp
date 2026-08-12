@@ -51,6 +51,18 @@ namespace DungeonSync::Presentation
             -MovementLimitY,
             MovementLimitY);
 
+        camera_.position = DirectX::XMFLOAT3{
+    playerPosition_.x,
+    playerPosition_.y,
+    -3.0F
+        };
+
+        camera_.target = DirectX::XMFLOAT3{
+            playerPosition_.x,
+            playerPosition_.y,
+            0.0F
+        };
+
         const DirectX::XMMATRIX nearCubeWorld =
             DirectX::XMMatrixRotationX(
                 totalSeconds * 0.7F) *
