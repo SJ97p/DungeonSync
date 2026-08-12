@@ -3,6 +3,7 @@
 #include <WinSock2.h>
 
 #include <cstdint>
+#include <cstddef>
 #include <string_view>
 
 namespace DungeonSync::Network
@@ -24,7 +25,9 @@ namespace DungeonSync::Network
             std::uint16_t port) noexcept;
 
         [[nodiscard]]
-        bool Send(std::string_view message) noexcept;
+        bool Send(
+            const void* data,
+            std::size_t size) noexcept;
 
         [[nodiscard]]
         bool IsConnected() const noexcept;

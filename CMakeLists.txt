@@ -31,12 +31,14 @@ add_executable(DungeonSyncClient WIN32
     Client/Network/TcpClient.h
     Shared/Network/WinsockRuntime.cpp
     Shared/Network/WinsockRuntime.h
+    Shared/Network/Packet.h
 )
 
 add_executable(DungeonSyncServer
     Server/main.cpp
     Shared/Network/WinsockRuntime.cpp
     Shared/Network/WinsockRuntime.h
+    Shared/Network/Packet.h
     Server/Network/TcpListener.cpp
     Server/Network/TcpListener.h
 )

@@ -1,5 +1,6 @@
 #include "../Shared/Network/WinsockRuntime.h"
 #include "Network/TcpListener.h"
+#include "../Shared/Network/Packet.h"
 
 #include <iostream>
 #include <cstdint>
@@ -52,53 +53,98 @@ int main()
     }
 
     std::cout << "Client connected successfully.\n";
-    std::cout << "Waiting for HELLO message...\n";
+    std::cout << "Receiving PlayerMovePacket stream...\n";
 
-    constexpr int HelloMessageSize = 5;
-    char receiveBuffer[HelloMessageSize + 1]{};
+    std::uint32_t lastSequence = 0;
 
-    int totalReceivedBytes = 0;
-
-    while (totalReceivedBytes < HelloMessageSize)
+    while (true)
     {
-        const int receivedBytes = recv(
-            clientSocket,
-            receiveBuffer + totalReceivedBytes,
-            HelloMessageSize - totalReceivedBytes,
-            0);
+        DungeonSync::Network::PlayerMovePacket movePacket{};
 
-        if (receivedBytes == SOCKET_ERROR)
+        char* packetBytes =
+            reinterpret_cast<char*>(&movePacket);
+
+        int totalReceivedBytes = 0;
+
+        while (totalReceivedBytes <
+            static_cast<int>(sizeof(movePacket)))
+        {
+            const int receivedBytes = recv(
+                clientSocket,
+                packetBytes + totalReceivedBytes,
+                static_cast<int>(sizeof(movePacket)) -
+                totalReceivedBytes,
+                0);
+
+            if (receivedBytes == SOCKET_ERROR)
+            {
+                std::cerr
+                    << "Failed to receive packet. Error: "
+                    << WSAGetLastError()
+                    << '\n';
+
+                closesocket(clientSocket);
+                return 1;
+            }
+
+            if (receivedBytes == 0)
+            {
+                std::cout << "Client disconnected.\n";
+
+                closesocket(clientSocket);
+                return 0;
+            }
+
+            totalReceivedBytes += receivedBytes;
+        }
+
+        const std::uint16_t packetSize =
+            ntohs(movePacket.size);
+
+        const auto packetType =
+            static_cast<DungeonSync::Network::PacketType>(
+                ntohs(movePacket.type));
+
+        if (packetSize != sizeof(movePacket) ||
+            packetType !=
+            DungeonSync::Network::PacketType::PlayerMove)
+        {
+            std::cerr << "Received an invalid packet.\n";
+
+            closesocket(clientSocket);
+            return 1;
+        }
+
+        const std::uint32_t sequence =
+            ntohl(movePacket.sequence);
+
+        if (sequence <= lastSequence)
         {
             std::cerr
-                << "Failed to receive data. Error: "
-                << WSAGetLastError()
+                << "Ignored stale move packet. Sequence: "
+                << sequence
                 << '\n';
 
-            closesocket(clientSocket);
-            return 1;
+            continue;
         }
 
-        if (receivedBytes == 0)
-        {
-            std::cerr
-                << "Client disconnected before sending HELLO.\n";
+        lastSequence = sequence;
 
-            closesocket(clientSocket);
-            return 1;
-        }
+        const float positionX =
+            DungeonSync::Network::DecodeFloat(
+                movePacket.positionX);
 
-        totalReceivedBytes += receivedBytes;
+        const float positionY =
+            DungeonSync::Network::DecodeFloat(
+                movePacket.positionY);
+
+        std::cout
+            << "Move"
+            << " | sequence: " << sequence
+            << " | position: ("
+            << positionX
+            << ", "
+            << positionY
+            << ")\n";
     }
-
-    std::cout
-        << "Received from client: "
-        << receiveBuffer
-        << '\n';
-
-    std::cout << "Press Enter to disconnect the client.\n";
-    std::cin.get();
-
-    closesocket(clientSocket);
-
-    return 0;
 }

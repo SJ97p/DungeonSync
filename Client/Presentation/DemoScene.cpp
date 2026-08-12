@@ -217,6 +217,12 @@ OutputDebugStringA(debugMessage);
         }
     }
 
+    const DirectX::XMFLOAT2&
+        DemoScene::PlayerPosition() const noexcept
+    {
+        return playerPosition_;
+    }
+
     const Rendering::Camera&
         DemoScene::GetCamera() const noexcept
     {

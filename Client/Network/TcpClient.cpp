@@ -59,7 +59,9 @@ namespace DungeonSync::Network
         return true;
     }
 
-    bool TcpClient::Send(std::string_view message) noexcept
+    bool TcpClient::Send(
+        const void* data,
+        std::size_t size) noexcept
     {
         if (!IsConnected())
         {
@@ -67,15 +69,24 @@ namespace DungeonSync::Network
             return false;
         }
 
+        if (data == nullptr && size > 0)
+        {
+            errorCode_ = WSAEINVAL;
+            return false;
+        }
+
+        const char* bytes =
+            static_cast<const char*>(data);
+
         std::size_t totalSentBytes = 0;
 
-        while (totalSentBytes < message.size())
+        while (totalSentBytes < size)
         {
             const int sentBytes = send(
                 socket_,
-                message.data() + totalSentBytes,
+                bytes + totalSentBytes,
                 static_cast<int>(
-                    message.size() - totalSentBytes),
+                    size - totalSentBytes),
                 0);
 
             if (sentBytes == SOCKET_ERROR)

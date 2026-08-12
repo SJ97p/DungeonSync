@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "../Shared/Network/Packet.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -65,23 +66,6 @@ namespace DungeonSync
         OutputDebugStringA(
             "Connected to DungeonSync Server.\n");
 
-        if (!tcpClient_.Send("HELLO"))
-        {
-            char message[128]{};
-
-            std::snprintf(
-                message,
-                sizeof(message),
-                "Failed to send HELLO. Error: %d\n",
-                tcpClient_.ErrorCode());
-
-            OutputDebugStringA(message);
-
-            return EXIT_FAILURE;
-        }
-
-        OutputDebugStringA(
-            "Sent HELLO to DungeonSync Server.\n");
 
         if (!window_.Initialize(showCommand_))
         {
@@ -113,6 +97,13 @@ namespace DungeonSync
 
         float statisticsElapsedSeconds = 0.0F;
         std::size_t statisticsFrameCount = 0;
+
+        constexpr float NetworkSendIntervalSeconds = 0.05F;
+
+        float networkSendElapsedSeconds =
+            NetworkSendIntervalSeconds;
+
+        std::uint32_t moveSequence = 0;
 
         bool spaceWasDown = false;
 
@@ -174,6 +165,42 @@ namespace DungeonSync
                 moveX,
                 moveY,
                 attackPressed);
+
+            networkSendElapsedSeconds +=
+                frameElapsed.count();
+
+            if (networkSendElapsedSeconds >=
+                NetworkSendIntervalSeconds)
+            {
+                const DirectX::XMFLOAT2& playerPosition =
+                    demoScene_.PlayerPosition();
+
+                const Network::PlayerMovePacket movePacket =
+                    Network::MakePlayerMovePacket(
+                        ++moveSequence,
+                        playerPosition.x,
+                        playerPosition.y);
+
+                if (!tcpClient_.Send(
+                    &movePacket,
+                    sizeof(movePacket)))
+                {
+                    char message[128]{};
+
+                    std::snprintf(
+                        message,
+                        sizeof(message),
+                        "Failed to send move packet. Error: %d\n",
+                        tcpClient_.ErrorCode());
+
+                    OutputDebugStringA(message);
+
+                    return EXIT_FAILURE;
+                }
+
+                networkSendElapsedSeconds -=
+                    NetworkSendIntervalSeconds;
+            }
 
             renderer_.Render(
                 demoScene_.GetCamera(),

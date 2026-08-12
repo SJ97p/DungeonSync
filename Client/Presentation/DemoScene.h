@@ -23,6 +23,11 @@ namespace DungeonSync::Presentation
             float moveX,
             float moveY,
             bool attackPressed);
+
+        [[nodiscard]]
+        const DirectX::XMFLOAT2&
+            PlayerPosition() const noexcept;
+
         [[nodiscard]]
         const Rendering::Camera& GetCamera() const noexcept;
 
