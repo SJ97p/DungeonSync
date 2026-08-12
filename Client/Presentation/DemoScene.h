@@ -2,6 +2,7 @@
 
 #include "../Rendering/RenderItem.h"
 
+#include <DirectXMath.h>
 #include <array>
 #include <span>
 
@@ -12,13 +13,18 @@ namespace DungeonSync::Presentation
     public:
         DemoScene();
 
-        void Update(float totalSeconds);
+        void Update(
+            float totalSeconds,
+            float deltaSeconds,
+            float moveX,
+            float moveY);
 
         [[nodiscard]]
         std::span<const Rendering::RenderItem>
             RenderItems() const noexcept;
 
     private:
+        DirectX::XMFLOAT2 playerPosition_{};
         std::array<Rendering::RenderItem, 2> renderItems_{};
     };
 }

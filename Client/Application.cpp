@@ -51,6 +51,8 @@ namespace DungeonSync
         const auto startTime =
             std::chrono::steady_clock::now();
 
+        auto previousTime = startTime;
+
         while (window_.ProcessMessages())
         {
             const auto currentTime =
@@ -59,9 +61,53 @@ namespace DungeonSync
             const std::chrono::duration<float> elapsed =
                 currentTime - startTime;
 
+            const std::chrono::duration<float> frameElapsed =
+                currentTime - previousTime;
+
+            previousTime = currentTime;
+
             const float totalSeconds = elapsed.count();
 
-            demoScene_.Update(totalSeconds);
+            float moveX = 0.0F;
+            float moveY = 0.0F;
+
+            if ((GetAsyncKeyState('A') & 0x8000) != 0)
+            {
+                moveX -= 1.0F;
+            }
+
+            if ((GetAsyncKeyState('D') & 0x8000) != 0)
+            {
+                moveX += 1.0F;
+            }
+
+            if ((GetAsyncKeyState('S') & 0x8000) != 0)
+            {
+                moveY -= 1.0F;
+            }
+
+            if ((GetAsyncKeyState('W') & 0x8000) != 0)
+            {
+                moveY += 1.0F;
+            }
+
+            const float moveLengthSquared =
+                moveX * moveX + moveY * moveY;
+
+            if (moveLengthSquared > 1.0F)
+            {
+                constexpr float DiagonalNormalizer =
+                    0.70710678F;
+
+                moveX *= DiagonalNormalizer;
+                moveY *= DiagonalNormalizer;
+            }
+
+            demoScene_.Update(
+                totalSeconds,
+                frameElapsed.count(),
+                moveX,
+                moveY);
 
             renderer_.Render(
                 demoScene_.RenderItems());

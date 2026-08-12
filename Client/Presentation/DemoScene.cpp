@@ -23,13 +23,29 @@ namespace DungeonSync::Presentation
         };
     }
 
-    void DemoScene::Update(float totalSeconds)
+    void DemoScene::Update(
+        float totalSeconds,
+        float deltaSeconds,
+        float moveX,
+        float moveY)
     {
+        constexpr float PlayerMoveSpeed = 1.5F;
+
+        playerPosition_.x +=
+            moveX * PlayerMoveSpeed * deltaSeconds;
+
+        playerPosition_.y +=
+            moveY * PlayerMoveSpeed * deltaSeconds;
+
         const DirectX::XMMATRIX nearCubeWorld =
             DirectX::XMMatrixRotationX(
                 totalSeconds * 0.7F) *
             DirectX::XMMatrixRotationY(
-                totalSeconds);
+                totalSeconds) *
+            DirectX::XMMatrixTranslation(
+                playerPosition_.x,
+                playerPosition_.y,
+                0.0F);
 
         const DirectX::XMMATRIX farCubeWorld =
             DirectX::XMMatrixScaling(
