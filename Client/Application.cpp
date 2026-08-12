@@ -110,6 +110,7 @@ namespace DungeonSync
                 moveY);
 
             renderer_.Render(
+                demoScene_.GetCamera(),
                 demoScene_.RenderItems());
         }
 

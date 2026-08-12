@@ -1,5 +1,6 @@
 #pragma once
 #include "RenderItem.h"
+#include "Camera.h"
 
 #include <Windows.h>
 #include <d3d11.h>
@@ -27,6 +28,7 @@ namespace DungeonSync::Rendering
             std::uint32_t height);
 
         void Render(
+            const Camera& camera,
             std::span<const RenderItem> renderItems);
 
     private:

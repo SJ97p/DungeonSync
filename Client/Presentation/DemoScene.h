@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Rendering/RenderItem.h"
+#include "../Rendering/Camera.h"
 
 #include <DirectXMath.h>
 #include <array>
@@ -18,6 +19,8 @@ namespace DungeonSync::Presentation
             float deltaSeconds,
             float moveX,
             float moveY);
+        [[nodiscard]]
+        const Rendering::Camera& GetCamera() const noexcept;
 
         [[nodiscard]]
         std::span<const Rendering::RenderItem>
@@ -26,5 +29,6 @@ namespace DungeonSync::Presentation
     private:
         DirectX::XMFLOAT2 playerPosition_{};
         std::array<Rendering::RenderItem, 2> renderItems_{};
+        Rendering::Camera camera_{};
     };
 }

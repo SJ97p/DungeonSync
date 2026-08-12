@@ -308,18 +308,19 @@ namespace DungeonSync::Rendering
     }
 
     void D3D11Renderer::Render(
+        const Camera& camera,
         std::span<const RenderItem> renderItems)
     {
         using namespace DirectX;
 
         const XMVECTOR cameraPosition =
-            XMVectorSet(0.0F, 0.0F, -3.0F, 1.0F);
+            XMLoadFloat3(&camera.position);
 
         const XMVECTOR cameraTarget =
-            XMVectorZero();
+            XMLoadFloat3(&camera.target);
 
         const XMVECTOR cameraUp =
-            XMVectorSet(0.0F, 1.0F, 0.0F, 0.0F);
+            XMLoadFloat3(&camera.up);
 
         const XMMATRIX view = XMMatrixLookAtLH(
             cameraPosition,
@@ -332,10 +333,10 @@ namespace DungeonSync::Rendering
 
         const XMMATRIX projection =
             XMMatrixPerspectiveFovLH(
-                XM_PIDIV4,
+                camera.fieldOfViewRadians,
                 aspectRatio,
-                0.1F,
-                100.0F);
+                camera.nearPlane,
+                camera.farPlane);
 
         // 3. Back Buffer를 렌더 타깃으로 연결하고 배경 지우기
         constexpr float backgroundColor[]{

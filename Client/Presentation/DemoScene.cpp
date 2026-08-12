@@ -1,6 +1,7 @@
 #include "DemoScene.h"
 
 #include <DirectXMath.h>
+#include <algorithm>
 
 namespace DungeonSync::Presentation
 {
@@ -37,6 +38,19 @@ namespace DungeonSync::Presentation
         playerPosition_.y +=
             moveY * PlayerMoveSpeed * deltaSeconds;
 
+        constexpr float MovementLimitX = 1.5F;
+        constexpr float MovementLimitY = 0.8F;
+
+        playerPosition_.x = std::clamp(
+            playerPosition_.x,
+            -MovementLimitX,
+            MovementLimitX);
+
+        playerPosition_.y = std::clamp(
+            playerPosition_.y,
+            -MovementLimitY,
+            MovementLimitY);
+
         const DirectX::XMMATRIX nearCubeWorld =
             DirectX::XMMatrixRotationX(
                 totalSeconds * 0.7F) *
@@ -68,6 +82,12 @@ namespace DungeonSync::Presentation
         DirectX::XMStoreFloat4x4(
             &renderItems_[1].world,
             farCubeWorld);
+    }
+
+    const Rendering::Camera&
+        DemoScene::GetCamera() const noexcept
+    {
+        return camera_;
     }
 
     std::span<const Rendering::RenderItem>
