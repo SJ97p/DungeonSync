@@ -23,7 +23,7 @@ add_executable(DungeonSyncClient WIN32
  "Client/Gameplay/Monster.h"
  "Client/Gameplay/CombatSystem.cpp"
  "Client/Gameplay/CombatSystem.h"
-)
+ "Client/Gameplay/SpatialGrid.h" "Client/Gameplay/SpatialGrid.cpp")
 
 add_executable(DungeonSyncServer
     Server/main.cpp

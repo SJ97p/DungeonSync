@@ -4,10 +4,11 @@
 #include <algorithm>
 #include <cstdio>
 #include <Windows.h>
+#include <vector>
 
 namespace DungeonSync::Presentation
 {
-    DemoScene::DemoScene()
+    DemoScene::DemoScene() : spatialGrid_(0.5F)
     {
         renderItems_[0].tintColor =
             DirectX::XMFLOAT4{
@@ -40,6 +41,8 @@ namespace DungeonSync::Presentation
                         static_cast<float>(row) * Spacing
             };
         }
+
+        spatialGrid_.Rebuild(monsters_);
 
         for (std::size_t index = 0;
             index < MonsterCount;
@@ -87,25 +90,32 @@ namespace DungeonSync::Presentation
             constexpr float AttackRange = 0.45F;
             constexpr float AttackDamage = 50.0F;
 
+            const std::vector<std::size_t> candidates =
+                spatialGrid_.Query(
+                    playerPosition_,
+                    AttackRange);
+
             lastAttackResult_ =
-                combatSystem_.ApplyAreaAttack(
+                combatSystem_.ApplyAreaAttackToCandidates(
                     playerPosition_,
                     AttackRange,
                     AttackDamage,
-                    monsters_);
+                    monsters_,
+                    candidates);
 
             char debugMessage[256]{};
 
             std::snprintf(
                 debugMessage,
                 sizeof(debugMessage),
-                "Area attack - examined: %zu, hits: %zu, elapsed: %lld ns\n",
+                "Grid attack - candidates: %zu, examined: %zu, hits: %zu, elapsed: %lld ns\n",
+                candidates.size(),
                 lastAttackResult_.examinedCount,
                 lastAttackResult_.hitCount,
                 static_cast<long long>(
                     lastAttackResult_.elapsedNanoseconds));
 
-            OutputDebugStringA(debugMessage);
+OutputDebugStringA(debugMessage);
         }
 
         camera_.position = DirectX::XMFLOAT3{

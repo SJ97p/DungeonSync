@@ -4,6 +4,7 @@
 #include "../Rendering/Camera.h"
 #include "../Gameplay/Monster.h"
 #include "../Gameplay/CombatSystem.h"
+#include "../Gameplay/SpatialGrid.h"
 
 #include <DirectXMath.h>
 #include <array>
@@ -37,6 +38,7 @@ namespace DungeonSync::Presentation
         std::array<Gameplay::Monster, MonsterCount>
             monsters_{};
         Gameplay::CombatSystem combatSystem_{};
+        Gameplay::SpatialGrid spatialGrid_;
         Gameplay::AreaAttackResult
             lastAttackResult_{};
 
