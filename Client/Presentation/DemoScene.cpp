@@ -2,6 +2,8 @@
 
 #include <DirectXMath.h>
 #include <algorithm>
+#include <cstdio>
+#include <Windows.h>
 
 namespace DungeonSync::Presentation
 {
@@ -15,23 +17,29 @@ namespace DungeonSync::Presentation
                 1.0F
         };
 
-        monsters_ = {
-            Gameplay::Monster{
-                DirectX::XMFLOAT2{ -1.2F,  0.6F }
-            },
-            Gameplay::Monster{
-                DirectX::XMFLOAT2{  0.0F,  0.7F }
-            },
-            Gameplay::Monster{
-                DirectX::XMFLOAT2{  1.2F,  0.6F }
-            },
-            Gameplay::Monster{
-                DirectX::XMFLOAT2{ -0.8F, -0.6F }
-            },
-            Gameplay::Monster{
-                DirectX::XMFLOAT2{  0.8F, -0.6F }
-            }
-        };
+        constexpr std::size_t ColumnCount = 10;
+        constexpr float Spacing = 0.32F;
+        constexpr float StartX = -1.44F;
+        constexpr float StartY = -1.44F;
+
+        for (std::size_t index = 0;
+            index < MonsterCount;
+            ++index)
+        {
+            const std::size_t column =
+                index % ColumnCount;
+
+            const std::size_t row =
+                index / ColumnCount;
+
+            monsters_[index].position =
+                DirectX::XMFLOAT2{
+                    StartX +
+                        static_cast<float>(column) * Spacing,
+                    StartY +
+                        static_cast<float>(row) * Spacing
+            };
+        }
 
         for (std::size_t index = 0;
             index < MonsterCount;
@@ -76,15 +84,28 @@ namespace DungeonSync::Presentation
 
         if (attackPressed)
         {
-            constexpr float AttackRange = 0.75F;
+            constexpr float AttackRange = 0.45F;
             constexpr float AttackDamage = 50.0F;
 
-            lastAttackHitCount_ =
+            lastAttackResult_ =
                 combatSystem_.ApplyAreaAttack(
                     playerPosition_,
                     AttackRange,
                     AttackDamage,
                     monsters_);
+
+            char debugMessage[256]{};
+
+            std::snprintf(
+                debugMessage,
+                sizeof(debugMessage),
+                "Area attack - examined: %zu, hits: %zu, elapsed: %lld ns\n",
+                lastAttackResult_.examinedCount,
+                lastAttackResult_.hitCount,
+                static_cast<long long>(
+                    lastAttackResult_.elapsedNanoseconds));
+
+            OutputDebugStringA(debugMessage);
         }
 
         camera_.position = DirectX::XMFLOAT3{
@@ -101,9 +122,9 @@ namespace DungeonSync::Presentation
 
         const DirectX::XMMATRIX playerWorld =
             DirectX::XMMatrixScaling(
-                0.35F,
-                0.35F,
-                0.35F) *
+                0.18F,
+                0.18F,
+                0.18F) *
             DirectX::XMMatrixTranslation(
                 playerPosition_.x,
                 playerPosition_.y,
@@ -151,9 +172,9 @@ namespace DungeonSync::Presentation
 
             const DirectX::XMMATRIX monsterWorld =
                 DirectX::XMMatrixScaling(
-                    0.3F,
-                    0.3F,
-                    0.3F) *
+                    0.12F,
+                    0.12F,
+                    0.12F) *
                 DirectX::XMMatrixTranslation(
                     monsterPosition.x,
                     monsterPosition.y,

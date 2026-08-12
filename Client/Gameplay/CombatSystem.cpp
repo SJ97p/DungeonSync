@@ -1,10 +1,11 @@
 #include "CombatSystem.h"
 
 #include <algorithm>
+#include <chrono>
 
 namespace DungeonSync::Gameplay
 {
-    std::size_t CombatSystem::ApplyAreaAttack(
+    AreaAttackResult CombatSystem::ApplyAreaAttack(
         const DirectX::XMFLOAT2& origin,
         float range,
         float damage,
@@ -12,16 +13,21 @@ namespace DungeonSync::Gameplay
     {
         if (range <= 0.0F || damage <= 0.0F)
         {
-            return 0;
+            return {};
         }
+
+        const auto startTime =
+            std::chrono::steady_clock::now();
 
         const float rangeSquared =
             range * range;
 
-        std::size_t hitCount = 0;
+        AreaAttackResult attackResult{};
 
         for (Monster& monster : monsters)
         {
+            ++attackResult.examinedCount;
+
             if (!monster.alive)
             {
                 continue;
@@ -51,9 +57,18 @@ namespace DungeonSync::Gameplay
                 monster.alive = false;
             }
 
-            ++hitCount;
+            ++attackResult.hitCount;
         }
 
-        return hitCount;
+        const auto endTime =
+            std::chrono::steady_clock::now();
+
+        attackResult.elapsedNanoseconds =
+            std::chrono::duration_cast<
+            std::chrono::nanoseconds>(
+                endTime - startTime)
+            .count();
+
+        return attackResult;
     }
 }

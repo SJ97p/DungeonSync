@@ -30,14 +30,15 @@ namespace DungeonSync::Presentation
             RenderItems() const noexcept;
 
     private:
-        static constexpr std::size_t MonsterCount = 5;
+        static constexpr std::size_t MonsterCount = 100;
 
         DirectX::XMFLOAT2 playerPosition_{};
 
         std::array<Gameplay::Monster, MonsterCount>
             monsters_{};
         Gameplay::CombatSystem combatSystem_{};
-        std::size_t lastAttackHitCount_{};
+        Gameplay::AreaAttackResult
+            lastAttackResult_{};
 
         std::array<
             Rendering::RenderItem,
