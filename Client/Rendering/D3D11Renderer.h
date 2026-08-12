@@ -1,6 +1,7 @@
 #pragma once
 #include "RenderItem.h"
 #include "Camera.h"
+#include "InstanceData.h"
 
 #include <Windows.h>
 #include <d3d11.h>
@@ -8,6 +9,7 @@
 #include <wrl/client.h>
 #include <span>
 #include <cstdint>
+#include <cstddef>
 
 namespace DungeonSync::Rendering
 {
@@ -42,6 +44,7 @@ namespace DungeonSync::Rendering
         [[nodiscard]] bool CreateCubeGeometryBuffers();
         [[nodiscard]] bool CreateShadersAndInputLayout();
         [[nodiscard]] bool CreateConstantBuffer();
+        [[nodiscard]] bool CreateInstanceBuffer();
 
         Microsoft::WRL::ComPtr<ID3D11Device> device_;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> deviceContext_;
@@ -55,9 +58,11 @@ namespace DungeonSync::Rendering
         Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
         Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> instanceBuffer_;
 
         D3D_FEATURE_LEVEL featureLevel_{};
 
+        static constexpr std::size_t MaxInstanceCount = 1024;
         std::uint32_t width_{};
         std::uint32_t height_{};
     };

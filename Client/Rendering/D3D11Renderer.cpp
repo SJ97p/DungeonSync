@@ -6,6 +6,7 @@
 #include <iterator>
 #include <cstddef>
 #include <cstring>
+#include <algorithm>
 
 using Microsoft::WRL::ComPtr;
 
@@ -73,13 +74,12 @@ namespace
         4, 3, 7
     };
 
-    struct alignas(16) ObjectConstants
+    struct alignas(16) SceneConstants
     {
-        DirectX::XMFLOAT4X4 worldViewProjection;
-        DirectX::XMFLOAT4 tintColor;
+        DirectX::XMFLOAT4X4 viewProjection;
     };
 
-    static_assert(sizeof(ObjectConstants) % 16 == 0);
+    static_assert(sizeof(SceneConstants) % 16 == 0);
 
     HRESULT CompileShader(
         const wchar_t* filePath,
@@ -157,6 +157,11 @@ namespace DungeonSync::Rendering
         }
 
         if (!CreateConstantBuffer())
+        {
+            return false;
+        }
+
+        if (!CreateInstanceBuffer())
         {
             return false;
         }
@@ -338,6 +343,116 @@ namespace DungeonSync::Rendering
                 camera.nearPlane,
                 camera.farPlane);
 
+        const XMMATRIX viewProjection =
+            view * projection;
+
+        SceneConstants sceneConstants{};
+
+        XMStoreFloat4x4(
+            &sceneConstants.viewProjection,
+            viewProjection);
+
+        D3D11_MAPPED_SUBRESOURCE
+            mappedSceneConstants{};
+
+        HRESULT result = deviceContext_->Map(
+            constantBuffer_.Get(),
+            0,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &mappedSceneConstants);
+
+        if (FAILED(result))
+        {
+            return;
+        }
+
+        std::memcpy(
+            mappedSceneConstants.pData,
+            &sceneConstants,
+            sizeof(sceneConstants));
+
+        deviceContext_->Unmap(
+            constantBuffer_.Get(),
+            0);
+
+        const std::size_t instanceCount =
+            std::min(
+                renderItems.size(),
+                MaxInstanceCount);
+
+        if (instanceCount == 0)
+        {
+            swapChain_->Present(1, 0);
+            return;
+        }
+
+        D3D11_MAPPED_SUBRESOURCE
+            mappedInstances{};
+
+        result = deviceContext_->Map(
+            instanceBuffer_.Get(),
+            0,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &mappedInstances);
+
+        if (FAILED(result))
+        {
+            return;
+        }
+
+        auto* instanceData =
+            static_cast<InstanceData*>(
+                mappedInstances.pData);
+
+        for (std::size_t index = 0;
+            index < instanceCount;
+            ++index)
+        {
+            const RenderItem& item =
+                renderItems[index];
+
+            instanceData[index].worldRow0 =
+                DirectX::XMFLOAT4{
+                    item.world._11,
+                    item.world._12,
+                    item.world._13,
+                    item.world._14
+            };
+
+            instanceData[index].worldRow1 =
+                DirectX::XMFLOAT4{
+                    item.world._21,
+                    item.world._22,
+                    item.world._23,
+                    item.world._24
+            };
+
+            instanceData[index].worldRow2 =
+                DirectX::XMFLOAT4{
+                    item.world._31,
+                    item.world._32,
+                    item.world._33,
+                    item.world._34
+            };
+
+            instanceData[index].worldRow3 =
+                DirectX::XMFLOAT4{
+                    item.world._41,
+                    item.world._42,
+                    item.world._43,
+                    item.world._44
+            };
+
+            instanceData[index].tintColor =
+                item.tintColor;
+        }
+
+        deviceContext_->Unmap(
+            instanceBuffer_.Get(),
+            0);
+
         // 3. Back Buffer를 렌더 타깃으로 연결하고 배경 지우기
         constexpr float backgroundColor[]{
             0.03F,
@@ -368,18 +483,26 @@ namespace DungeonSync::Rendering
 
         // 4. Vertex Buffer와 Index Buffer 연결
         ID3D11Buffer* vertexBuffers[]{
-            vertexBuffer_.Get()
+            vertexBuffer_.Get(),
+            instanceBuffer_.Get()
         };
 
-        constexpr UINT stride = sizeof(Vertex);
-        constexpr UINT offset = 0;
+
+        constexpr UINT strides[]{
+            sizeof(Vertex),
+            sizeof(InstanceData)
+        };
+        constexpr UINT offsets[]{
+            0,
+            0
+        };
 
         deviceContext_->IASetVertexBuffers(
             0,
-            1,
+            2,
             vertexBuffers,
-            &stride,
-            &offset);
+            strides,
+            offsets);
 
         deviceContext_->IASetIndexBuffer(
             indexBuffer_.Get(),
@@ -414,61 +537,14 @@ namespace DungeonSync::Rendering
             nullptr,
             0);
 
-        const auto drawCube =
-            [&](const RenderItem& item) -> bool
-            {
-                const XMMATRIX world =
-                    XMLoadFloat4x4(&item.world);
-
-                const XMMATRIX worldViewProjection =
-                    world * view * projection;
-
-                ObjectConstants constants{};
-
-                XMStoreFloat4x4(
-                    &constants.worldViewProjection,
-                    worldViewProjection);
-                
-                constants.tintColor = item.tintColor;
-
-                D3D11_MAPPED_SUBRESOURCE mappedResource{};
-
-                const HRESULT mapResult = deviceContext_->Map(
-                    constantBuffer_.Get(),
-                    0,
-                    D3D11_MAP_WRITE_DISCARD,
-                    0,
-                    &mappedResource);
-
-                if (FAILED(mapResult))
-                {
-                    return false;
-                }
-
-                std::memcpy(
-                    mappedResource.pData,
-                    &constants,
-                    sizeof(constants));
-
-                deviceContext_->Unmap(
-                    constantBuffer_.Get(),
-                    0);
-
-                deviceContext_->DrawIndexed(
-                    static_cast<UINT>(std::size(CubeIndices)),
-                    0,
-                    0);
-
-                return true;
-            };
-
-        for (const RenderItem& item : renderItems)
-        {
-            if (!drawCube(item))
-            {
-                return;
-            }
-        }
+        deviceContext_->DrawIndexedInstanced(
+            static_cast<UINT>(
+                std::size(CubeIndices)),
+            static_cast<UINT>(
+                instanceCount),
+            0,
+            0,
+            0);
 
         // 9. 완성된 Back Buffer를 창에 표시
         swapChain_->Present(1, 0);
@@ -591,7 +667,58 @@ namespace DungeonSync::Rendering
                 static_cast<UINT>(offsetof(Vertex, color)),
                 D3D11_INPUT_PER_VERTEX_DATA,
                 0
-            }
+            },
+{
+    "INSTANCE_WORLD",
+    0,
+    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    1,
+    static_cast<UINT>(
+        offsetof(InstanceData, worldRow0)),
+    D3D11_INPUT_PER_INSTANCE_DATA,
+    1
+},
+{
+    "INSTANCE_WORLD",
+    1,
+    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    1,
+    static_cast<UINT>(
+        offsetof(InstanceData, worldRow1)),
+    D3D11_INPUT_PER_INSTANCE_DATA,
+    1
+},
+{
+    "INSTANCE_WORLD",
+    2,
+    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    1,
+    static_cast<UINT>(
+        offsetof(InstanceData, worldRow2)),
+    D3D11_INPUT_PER_INSTANCE_DATA,
+    1
+},
+{
+    "INSTANCE_WORLD",
+    3,
+    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    1,
+    static_cast<UINT>(
+        offsetof(InstanceData, worldRow3)),
+    D3D11_INPUT_PER_INSTANCE_DATA,
+    1
+},
+{
+    "INSTANCE_COLOR",
+    0,
+    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    1,
+    static_cast<UINT>(
+        offsetof(InstanceData, tintColor)),
+    D3D11_INPUT_PER_INSTANCE_DATA,
+    1
+}
+
         };
 
         result = device_->CreateInputLayout(
@@ -607,7 +734,8 @@ namespace DungeonSync::Rendering
     bool D3D11Renderer::CreateConstantBuffer()
     {
         D3D11_BUFFER_DESC bufferDescription{};
-        bufferDescription.ByteWidth = sizeof(ObjectConstants);
+        bufferDescription.ByteWidth =
+            sizeof(SceneConstants);
         bufferDescription.Usage = D3D11_USAGE_DYNAMIC;
         bufferDescription.BindFlags =
             D3D11_BIND_CONSTANT_BUFFER;
@@ -619,6 +747,32 @@ namespace DungeonSync::Rendering
             &bufferDescription,
             nullptr,
             constantBuffer_.ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::CreateInstanceBuffer()
+    {
+        D3D11_BUFFER_DESC bufferDescription{};
+
+        bufferDescription.ByteWidth =
+            static_cast<UINT>(
+                sizeof(InstanceData) *
+                MaxInstanceCount);
+
+        bufferDescription.Usage =
+            D3D11_USAGE_DYNAMIC;
+
+        bufferDescription.BindFlags =
+            D3D11_BIND_VERTEX_BUFFER;
+
+        bufferDescription.CPUAccessFlags =
+            D3D11_CPU_ACCESS_WRITE;
+
+        const HRESULT result = device_->CreateBuffer(
+            &bufferDescription,
+            nullptr,
+            instanceBuffer_.ReleaseAndGetAddressOf());
 
         return SUCCEEDED(result);
     }
