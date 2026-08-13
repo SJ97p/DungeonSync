@@ -10,52 +10,93 @@ namespace DungeonSync::Presentation
 {
     DemoScene::DemoScene() 
         : spatialGrid_(0.5F),
-        dungeonController_(
-            0,
-            MonsterCount,
-            DirectX::XMFLOAT2{
-                -1.5F,
-                -1.5F
-            },
-            DirectX::XMFLOAT2{
-                1.5F,
-                1.5F
-            })
+        dungeonController_()
     {
-        renderItems_[0].tintColor =
-            DirectX::XMFLOAT4{
-                1.0F,
-                0.35F,
-                0.35F,
-                1.0F
-        };
+        PrepareCurrentRoom();
+        (void)dungeonController_.ConsumeRoomChanged();
+    }
+
+    void DemoScene::PrepareCurrentRoom()
+    {
+        const Gameplay::DungeonRoom& room =
+            dungeonController_.CurrentRoom();
 
         constexpr std::size_t ColumnCount = 10;
         constexpr float Spacing = 0.32F;
-        constexpr float StartX = -1.44F;
-        constexpr float StartY = -1.44F;
+
+        const std::size_t activeMonsterCount =
+            (std::min)(
+                room.monsterCount,
+                monsters_.size());
+
+        const std::size_t rowCount =
+            (activeMonsterCount +
+                ColumnCount - 1) /
+            ColumnCount;
+
+        const float startX =
+            -static_cast<float>(
+                (std::min)(
+                    activeMonsterCount,
+                    ColumnCount) - 1) *
+            Spacing *
+            0.5F;
+
+        const float startY =
+            -static_cast<float>(
+                rowCount - 1) *
+            Spacing *
+            0.5F;
 
         for (std::size_t index = 0;
-            index < MonsterCount;
+            index < monsters_.size();
             ++index)
         {
+            Gameplay::Monster& monster =
+                monsters_[index];
+
+            if (index >= activeMonsterCount)
+            {
+                monster.health = 0.0F;
+                monster.alive = false;
+                continue;
+            }
+
             const std::size_t column =
                 index % ColumnCount;
 
             const std::size_t row =
                 index / ColumnCount;
 
-            monsters_[index].position =
+            monster.position =
                 DirectX::XMFLOAT2{
-                    StartX +
-                        static_cast<float>(column) * Spacing,
-                    StartY +
-                        static_cast<float>(row) * Spacing
+                    startX +
+                        static_cast<float>(column) *
+                        Spacing,
+                    startY +
+                        static_cast<float>(row) *
+                        Spacing
             };
+
+            monster.health = room.monsterHealth;
+            monster.alive = true;
         }
 
         spatialGrid_.Rebuild(monsters_);
 
+        char message[128]{};
+
+        std::snprintf(
+            message,
+            sizeof(message),
+            "Prepared Room %zu"
+            " | monsters: %zu"
+            " | health: %.0f\n",
+            dungeonController_.CurrentRoomIndex() + 1,
+            activeMonsterCount,
+            room.monsterHealth);
+
+        OutputDebugStringA(message);
     }
 
     void DemoScene::Update(
@@ -64,6 +105,11 @@ namespace DungeonSync::Presentation
         float moveY,
         bool attackPressed)
     {
+        if (dungeonController_.ConsumeRoomChanged())
+        {
+            PrepareCurrentRoom();
+        }
+
         constexpr float PlayerMoveSpeed = 1.5F;
 
         playerPosition_.x +=
@@ -85,35 +131,76 @@ namespace DungeonSync::Presentation
             -MovementLimitY,
             MovementLimitY);
 
-        const Gameplay::RoomState previousRoomState =
-            dungeonController_
-            .CurrentRoom()
-            .state;
+        const Gameplay::RoomState stateBeforeUpdate =
+            dungeonController_.CurrentRoom().state;
 
         dungeonController_.Update(
             playerPosition_,
             monsters_);
 
-        const Gameplay::RoomState currentRoomState =
-            dungeonController_
-            .CurrentRoom()
-            .state;
+        const Gameplay::RoomState stateAfterUpdate =
+            dungeonController_.CurrentRoom().state;
 
-        if (previousRoomState != currentRoomState)
+        if (stateBeforeUpdate ==
+            Gameplay::RoomState::Ready &&
+            stateAfterUpdate ==
+            Gameplay::RoomState::Combat)
         {
-            if (currentRoomState ==
-                Gameplay::RoomState::Combat)
-            {
-                OutputDebugStringA(
-                    "Room 1 entered Combat state.\n");
-            }
-            else if (currentRoomState ==
-                Gameplay::RoomState::Cleared)
-            {
-                OutputDebugStringA(
-                    "Room 1 cleared.\n");
-            }
+            char roomMessage[128]{};
+
+            std::snprintf(
+                roomMessage,
+                sizeof(roomMessage),
+                "Room %zu entered Combat state.\n",
+                dungeonController_.CurrentRoomIndex() + 1);
+
+            OutputDebugStringA(roomMessage);
         }
+
+        //const std::size_t previousRoomIndex =
+        //    dungeonController_.CurrentRoomIndex();
+
+        //const Gameplay::RoomState previousRoomState =
+        //    dungeonController_
+        //    .CurrentRoom()
+        //    .state;
+
+        //dungeonController_.Update(
+        //    playerPosition_,
+        //    monsters_);
+
+        //const Gameplay::RoomState currentRoomState =
+        //    dungeonController_
+        //    .CurrentRoom()
+        //    .state;
+
+        //if (previousRoomState != currentRoomState)
+        //{
+        //    char roomMessage[128]{};
+
+        //    if (currentRoomState ==
+        //        Gameplay::RoomState::Combat)
+        //    {
+        //        std::snprintf(
+        //            roomMessage,
+        //            sizeof(roomMessage),
+        //            "Room %zu entered Combat state.\n",
+        //            previousRoomIndex + 1);
+
+        //        OutputDebugStringA(roomMessage);
+        //    }
+        //    else if (currentRoomState ==
+        //        Gameplay::RoomState::Cleared)
+        //    {
+        //        std::snprintf(
+        //            roomMessage,
+        //            sizeof(roomMessage),
+        //            "Room %zu cleared.\n",
+        //            previousRoomIndex + 1);
+
+        //        OutputDebugStringA(roomMessage);
+        //    }
+        //}
 
         if (attackPressed)
         {
@@ -145,7 +232,34 @@ namespace DungeonSync::Presentation
                 static_cast<long long>(
                     lastAttackResult_.elapsedNanoseconds));
 
-OutputDebugStringA(debugMessage);
+            OutputDebugStringA(debugMessage);
+
+            dungeonController_.Update(
+                playerPosition_,
+                monsters_);
+
+        }
+
+        std::size_t clearedRoomIndex = 0;
+
+        if (dungeonController_.ConsumeClearedRoom(
+            clearedRoomIndex))
+        {
+            char roomMessage[128]{};
+
+            std::snprintf(
+                roomMessage,
+                sizeof(roomMessage),
+                "Room %zu cleared.\n",
+                clearedRoomIndex + 1);
+
+            OutputDebugStringA(roomMessage);
+        }
+
+        if (dungeonController_.ConsumeDungeonCleared())
+        {
+            OutputDebugStringA(
+                "Dungeon cleared. Press R to restart.\n");
         }
 
         camera_.position = DirectX::XMFLOAT3{
@@ -229,6 +343,25 @@ OutputDebugStringA(debugMessage);
 
             ++visibleRenderItemCount_;
         }
+    }
+
+    void DemoScene::RestartDungeon()
+    {
+        dungeonController_.Restart();
+
+        playerPosition_ =
+            DirectX::XMFLOAT2{
+                0.0F,
+                0.0F
+        };
+
+        PrepareCurrentRoom();
+
+        (void)dungeonController_
+            .ConsumeRoomChanged();
+
+        OutputDebugStringA(
+            "Dungeon restarted.\n");
     }
 
     const DirectX::XMFLOAT2&

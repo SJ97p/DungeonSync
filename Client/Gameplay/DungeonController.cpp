@@ -4,79 +4,178 @@
 
 namespace DungeonSync::Gameplay
 {
-    DungeonController::DungeonController(
-        std::size_t firstMonsterIndex,
-        std::size_t monsterCount,
-        const DirectX::XMFLOAT2& minimumBounds,
-        const DirectX::XMFLOAT2& maximumBounds) noexcept
-        : room_{
-            firstMonsterIndex,
-            monsterCount,
-            minimumBounds,
-            maximumBounds,
-            RoomState::Ready
+    DungeonController::DungeonController() noexcept
+        : rooms_{
+            DungeonRoom{
+                15,
+                100.0F,
+                DirectX::XMFLOAT2{-1.5F, -1.5F},
+                DirectX::XMFLOAT2{1.5F, 1.5F},
+                RoomState::Ready
+            },
+            DungeonRoom{
+                100,
+                100.0F,
+                DirectX::XMFLOAT2{-1.5F, -1.5F},
+                DirectX::XMFLOAT2{1.5F, 1.5F},
+                RoomState::Ready
+            },
+            DungeonRoom{
+                12,
+                250.0F,
+                DirectX::XMFLOAT2{-1.5F, -1.5F},
+                DirectX::XMFLOAT2{1.5F, 1.5F},
+                RoomState::Ready
+            }
         }
-    {
-    }
+    { }
 
     void DungeonController::Update(
         const DirectX::XMFLOAT2& playerPosition,
         std::span<const Monster> monsters) noexcept
     {
-        if (room_.state == RoomState::Ready)
+        if (dungeonCleared_)
         {
-            if (ContainsPlayer(playerPosition))
+            return;
+        }
+
+        DungeonRoom& room =
+            rooms_[currentRoomIndex_];
+
+        if (room.state == RoomState::Ready)
+        {
+            if (ContainsPlayer(
+                room,
+                playerPosition))
             {
-                room_.state = RoomState::Combat;
+                room.state = RoomState::Combat;
             }
 
             return;
         }
 
-        if (room_.state != RoomState::Combat)
+        if (room.state != RoomState::Combat)
         {
             return;
         }
 
-        if (AliveMonsterCount(monsters) == 0)
+        if (AliveMonsterCount(monsters) != 0)
         {
-            room_.state = RoomState::Cleared;
+            return;
         }
+
+        room.state = RoomState::Cleared;
+
+        lastClearedRoomIndex_ =
+            currentRoomIndex_;
+
+        hasClearedRoomEvent_ = true;
+
+        const std::size_t nextRoomIndex =
+            currentRoomIndex_ + 1;
+
+        if (nextRoomIndex >= rooms_.size())
+        {
+            dungeonCleared_ = true;
+            hasDungeonClearedEvent_ = true;
+            return;
+        }
+
+        currentRoomIndex_ = nextRoomIndex;
+        roomChanged_ = true;
     }
 
     const DungeonRoom&
         DungeonController::CurrentRoom() const noexcept
     {
-        return room_;
+        return rooms_[currentRoomIndex_];
+    }
+
+    std::size_t
+        DungeonController::CurrentRoomIndex() const noexcept
+    {
+        return currentRoomIndex_;
+    }
+
+    bool DungeonController::IsDungeonCleared() const noexcept
+    {
+        return dungeonCleared_;
+    }
+
+    bool DungeonController::ConsumeRoomChanged() noexcept
+    {
+        if (!roomChanged_)
+        {
+            return false;
+        }
+
+        roomChanged_ = false;
+        return true;
+    }
+
+    bool DungeonController::ConsumeClearedRoom(
+        std::size_t& clearedRoomIndex) noexcept
+    {
+        if (!hasClearedRoomEvent_)
+        {
+            return false;
+        }
+
+        clearedRoomIndex =
+            lastClearedRoomIndex_;
+
+        hasClearedRoomEvent_ = false;
+
+        return true;
+    }
+
+    bool DungeonController::ConsumeDungeonCleared()
+        noexcept
+    {
+        if (!hasDungeonClearedEvent_)
+        {
+            return false;
+        }
+
+        hasDungeonClearedEvent_ = false;
+
+        return true;
+    }
+
+    void DungeonController::Restart() noexcept
+    {
+        for (DungeonRoom& room : rooms_)
+        {
+            room.state = RoomState::Ready;
+        }
+
+        currentRoomIndex_ = 0;
+        dungeonCleared_ = false;
+        roomChanged_ = true;
+
+        lastClearedRoomIndex_ = 0;
+        hasClearedRoomEvent_ = false;
+        hasDungeonClearedEvent_ = false;
     }
 
     std::size_t DungeonController::AliveMonsterCount(
         std::span<const Monster> monsters) const noexcept
     {
-        if (room_.firstMonsterIndex >= monsters.size())
-        {
-            return 0;
-        }
-
-        const std::size_t availableCount =
-            monsters.size() -
-            room_.firstMonsterIndex;
+        const DungeonRoom& room =
+            CurrentRoom();
 
         const std::size_t count =
             (std::min)(
-                room_.monsterCount,
-                availableCount);
+                room.monsterCount,
+                monsters.size());
 
         std::size_t aliveCount = 0;
 
-        for (std::size_t offset = 0;
-            offset < count;
-            ++offset)
+        for (std::size_t index = 0;
+            index < count;
+            ++index)
         {
-            const std::size_t monsterIndex =
-                room_.firstMonsterIndex + offset;
-
-            if (monsters[monsterIndex].alive)
+            if (monsters[index].alive)
             {
                 ++aliveCount;
             }
@@ -86,17 +185,19 @@ namespace DungeonSync::Gameplay
     }
 
     bool DungeonController::ContainsPlayer(
+        const DungeonRoom& room,
         const DirectX::XMFLOAT2&
         playerPosition) const noexcept
     {
         return
             playerPosition.x >=
-            room_.minimumBounds.x &&
+            room.minimumBounds.x &&
             playerPosition.x <=
-            room_.maximumBounds.x &&
+            room.maximumBounds.x &&
             playerPosition.y >=
-            room_.minimumBounds.y &&
+            room.minimumBounds.y &&
             playerPosition.y <=
-            room_.maximumBounds.y;
+            room.maximumBounds.y;
     }
+
 }

@@ -15,8 +15,8 @@ namespace DungeonSync::Gameplay
 
     struct DungeonRoom
     {
-        std::size_t firstMonsterIndex{};
         std::size_t monsterCount{};
+        float monsterHealth{ 100.0F };
 
         DirectX::XMFLOAT2 minimumBounds{};
         DirectX::XMFLOAT2 maximumBounds{};

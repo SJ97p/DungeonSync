@@ -122,6 +122,8 @@ namespace DungeonSync
 
         bool spaceWasDown = false;
 
+        bool restartWasDown = false;
+
 #ifndef NDEBUG
         bool testKeyWasDown = false;
 #endif
@@ -181,6 +183,16 @@ namespace DungeonSync
                 spaceIsDown && !spaceWasDown;
 
             spaceWasDown = spaceIsDown;
+
+            const bool restartIsDown =
+                (GetAsyncKeyState('R') & 0x8000) != 0;
+
+            const bool restartPressed =
+                restartIsDown &&
+                !restartWasDown;
+
+            restartWasDown = restartIsDown;
+
 #ifndef NDEBUG
             const bool testKeyIsDown =
                 (GetAsyncKeyState('T') & 0x8000) != 0;
@@ -191,6 +203,11 @@ namespace DungeonSync
 
             testKeyWasDown = testKeyIsDown;
 #endif
+
+            if (restartPressed)
+            {
+                demoScene_.RestartDungeon();
+            }
 
             demoScene_.Update(
                 frameElapsed.count(),

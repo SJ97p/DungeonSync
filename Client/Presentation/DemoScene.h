@@ -25,6 +25,8 @@ namespace DungeonSync::Presentation
             float moveY,
             bool attackPressed);
 
+        void RestartDungeon();
+
         [[nodiscard]]
         const DirectX::XMFLOAT2&
             PlayerPosition() const noexcept;
@@ -43,6 +45,8 @@ namespace DungeonSync::Presentation
             RenderItems() const noexcept;
 
     private:
+        void PrepareCurrentRoom();
+
         static constexpr std::size_t MonsterCount = 100;
 
         DirectX::XMFLOAT2 playerPosition_{};
