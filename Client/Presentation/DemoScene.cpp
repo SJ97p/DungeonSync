@@ -8,7 +8,19 @@
 
 namespace DungeonSync::Presentation
 {
-    DemoScene::DemoScene() : spatialGrid_(0.5F)
+    DemoScene::DemoScene() 
+        : spatialGrid_(0.5F),
+        dungeonController_(
+            0,
+            MonsterCount,
+            DirectX::XMFLOAT2{
+                -1.5F,
+                -1.5F
+            },
+            DirectX::XMFLOAT2{
+                1.5F,
+                1.5F
+            })
     {
         renderItems_[0].tintColor =
             DirectX::XMFLOAT4{
@@ -61,7 +73,7 @@ namespace DungeonSync::Presentation
             moveY * PlayerMoveSpeed * deltaSeconds;
 
         constexpr float MovementLimitX = 1.5F;
-        constexpr float MovementLimitY = 0.8F;
+        constexpr float MovementLimitY = 1.5F;
 
         playerPosition_.x = std::clamp(
             playerPosition_.x,
@@ -72,6 +84,36 @@ namespace DungeonSync::Presentation
             playerPosition_.y,
             -MovementLimitY,
             MovementLimitY);
+
+        const Gameplay::RoomState previousRoomState =
+            dungeonController_
+            .CurrentRoom()
+            .state;
+
+        dungeonController_.Update(
+            playerPosition_,
+            monsters_);
+
+        const Gameplay::RoomState currentRoomState =
+            dungeonController_
+            .CurrentRoom()
+            .state;
+
+        if (previousRoomState != currentRoomState)
+        {
+            if (currentRoomState ==
+                Gameplay::RoomState::Combat)
+            {
+                OutputDebugStringA(
+                    "Room 1 entered Combat state.\n");
+            }
+            else if (currentRoomState ==
+                Gameplay::RoomState::Cleared)
+            {
+                OutputDebugStringA(
+                    "Room 1 cleared.\n");
+            }
+        }
 
         if (attackPressed)
         {

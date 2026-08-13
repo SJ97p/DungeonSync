@@ -5,6 +5,7 @@
 #include "../Gameplay/Monster.h"
 #include "../Gameplay/CombatSystem.h"
 #include "../Gameplay/SpatialGrid.h"
+#include "../Gameplay/DungeonController.h"
 
 #include <DirectXMath.h>
 #include <array>
@@ -50,6 +51,8 @@ namespace DungeonSync::Presentation
             monsters_{};
         Gameplay::CombatSystem combatSystem_{};
         Gameplay::SpatialGrid spatialGrid_;
+        Gameplay::DungeonController dungeonController_;
+        
         Gameplay::AreaAttackResult
             lastAttackResult_{};
 

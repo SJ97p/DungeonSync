@@ -112,8 +112,8 @@ int main()
 
     constexpr float MinWorldX = -1.5F;
     constexpr float MaxWorldX = 1.5F;
-    constexpr float MinWorldY = -0.8F;
-    constexpr float MaxWorldY = 0.8F;
+    constexpr float MinWorldY = -1.5F;
+    constexpr float MaxWorldY = 1.5F;
 
     while (true)
     {

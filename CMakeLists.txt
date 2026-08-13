@@ -25,12 +25,15 @@ add_executable(DungeonSyncClient WIN32
     Client/Gameplay/CombatSystem.h
     Client/Gameplay/SpatialGrid.h
     Client/Gameplay/SpatialGrid.cpp
+    Client/Gameplay/DungeonRoom.h
+    Client/Gameplay/DungeonController.cpp
+    Client/Gameplay/DungeonController.h
     Client/Rendering/InstanceData.h
     Client/Rendering/RenderStatistics.h
     Client/Network/TcpClient.cpp
     Client/Network/TcpClient.h
     Client/Network/ServerStateReceiver.cpp
-Client/Network/ServerStateReceiver.h
+    Client/Network/ServerStateReceiver.h
     Shared/Network/WinsockRuntime.cpp
     Shared/Network/WinsockRuntime.h
     Shared/Network/Packet.h
