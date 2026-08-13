@@ -28,6 +28,12 @@ namespace DungeonSync::Presentation
         const DirectX::XMFLOAT2&
             PlayerPosition() const noexcept;
 
+        void ReconcilePlayerPosition(
+            float serverPositionX,
+            float serverPositionY,
+            bool accepted,
+            float deltaSeconds) noexcept;
+
         [[nodiscard]]
         const Rendering::Camera& GetCamera() const noexcept;
 

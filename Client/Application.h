@@ -4,6 +4,7 @@
 #include "Rendering/D3D11Renderer.h"
 #include "Presentation/DemoScene.h"
 #include "Network/TcpClient.h"
+#include "Network/ServerStateReceiver.h"
 #include "../Shared/Network/WinsockRuntime.h"
 
 #include <WinSock2.h>
@@ -28,6 +29,8 @@ namespace DungeonSync
     private:
         Network::WinsockRuntime winsock_;
         Network::TcpClient tcpClient_;
+        Network::ServerStateReceiver
+            serverStateReceiver_;
 
         Platform::Window window_;
         Rendering::D3D11Renderer renderer_;

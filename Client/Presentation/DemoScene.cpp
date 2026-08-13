@@ -223,6 +223,50 @@ OutputDebugStringA(debugMessage);
         return playerPosition_;
     }
 
+    void DemoScene::ReconcilePlayerPosition(
+        float serverPositionX,
+        float serverPositionY,
+        bool accepted,
+        float deltaSeconds) noexcept
+    {
+        const float deltaX =
+            serverPositionX - playerPosition_.x;
+
+        const float deltaY =
+            serverPositionY - playerPosition_.y;
+
+        const float errorDistanceSquared =
+            deltaX * deltaX +
+            deltaY * deltaY;
+
+        constexpr float SnapDistance = 0.3F;
+        constexpr float SnapDistanceSquared =
+            SnapDistance * SnapDistance;
+
+        if (!accepted ||
+            errorDistanceSquared >
+            SnapDistanceSquared)
+        {
+            playerPosition_.x = serverPositionX;
+            playerPosition_.y = serverPositionY;
+
+            return;
+        }
+
+        constexpr float CorrectionSpeed = 8.0F;
+
+        const float correctionRatio =
+            (std::min)(
+                CorrectionSpeed * deltaSeconds,
+                1.0F);
+
+        playerPosition_.x +=
+            deltaX * correctionRatio;
+
+        playerPosition_.y +=
+            deltaY * correctionRatio;
+    }
+
     const Rendering::Camera&
         DemoScene::GetCamera() const noexcept
     {

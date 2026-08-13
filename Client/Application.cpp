@@ -17,7 +17,8 @@ namespace DungeonSync
     Application::Application(
         HINSTANCE instance,
         int showCommand) noexcept
-        : window_(
+        : serverStateReceiver_(tcpClient_), 
+        window_(
             instance,
             ClientWidth,
             ClientHeight),
@@ -66,6 +67,17 @@ namespace DungeonSync
         OutputDebugStringA(
             "Connected to DungeonSync Server.\n");
 
+        if (!serverStateReceiver_.Start())
+        {
+            OutputDebugStringA(
+                "Failed to start server state receiver.\n");
+
+            return EXIT_FAILURE;
+        }
+
+        OutputDebugStringA(
+            "Server state receiver started.\n");
+
 
         if (!window_.Initialize(showCommand_))
         {
@@ -106,6 +118,10 @@ namespace DungeonSync
         std::uint32_t moveSequence = 0;
 
         bool spaceWasDown = false;
+
+#ifndef NDEBUG
+        bool testKeyWasDown = false;
+#endif
 
         while (window_.ProcessMessages())
         {
@@ -159,6 +175,16 @@ namespace DungeonSync
                 spaceIsDown && !spaceWasDown;
 
             spaceWasDown = spaceIsDown;
+#ifndef NDEBUG
+            const bool testKeyIsDown =
+                (GetAsyncKeyState('T') & 0x8000) != 0;
+
+            const bool invalidMoveTestPressed =
+                testKeyIsDown &&
+                !testKeyWasDown;
+
+            testKeyWasDown = testKeyIsDown;
+#endif
 
             demoScene_.Update(
                 frameElapsed.count(),
@@ -201,6 +227,61 @@ namespace DungeonSync
                 networkSendElapsedSeconds -=
                     NetworkSendIntervalSeconds;
             }
+#ifndef NDEBUG
+            if (invalidMoveTestPressed)
+            {
+                const Network::PlayerMovePacket invalidMovePacket =
+                    Network::MakePlayerMovePacket(
+                        ++moveSequence,
+                        9999.0F,
+                        9999.0F);
+
+                if (!tcpClient_.Send(
+                    &invalidMovePacket,
+                    sizeof(invalidMovePacket)))
+                {
+                    OutputDebugStringA(
+                        "Failed to send invalid move test packet.\n");
+
+                    return EXIT_FAILURE;
+                }
+
+                OutputDebugStringA(
+                    "Sent invalid move test packet.\n");
+            }
+#endif
+
+            Network::PlayerStateSnapshot
+                serverState{};
+
+            if (serverStateReceiver_.TryConsumeLatest(
+                serverState))
+            {
+                demoScene_.ReconcilePlayerPosition(
+                    serverState.positionX,
+                    serverState.positionY,
+                    serverState.accepted,
+                    frameElapsed.count());
+
+                char stateMessage[256]{};
+
+                std::snprintf(
+                    stateMessage,
+                    sizeof(stateMessage),
+                    "Server state"
+                    " | sequence: %u"
+                    " | accepted: %s"
+                    " | position: (%.3f, %.3f)\n",
+                    serverState.sequence,
+                    serverState.accepted
+                    ? "true"
+                    : "false",
+                    serverState.positionX,
+                    serverState.positionY);
+
+                OutputDebugStringA(stateMessage);
+            }
+
 
             renderer_.Render(
                 demoScene_.GetCamera(),
@@ -238,6 +319,8 @@ namespace DungeonSync
             }
 
         }
+
+        serverStateReceiver_.Stop();
 
         return EXIT_SUCCESS;
     }

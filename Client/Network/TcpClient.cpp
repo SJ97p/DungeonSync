@@ -108,6 +108,56 @@ namespace DungeonSync::Network
         return true;
     }
 
+    bool TcpClient::Receive(
+        void* destination,
+        std::size_t size) noexcept
+    {
+        if (!IsConnected())
+        {
+            errorCode_ = WSAENOTCONN;
+            return false;
+        }
+
+        if (destination == nullptr && size > 0)
+        {
+            errorCode_ = WSAEINVAL;
+            return false;
+        }
+
+        char* bytes =
+            static_cast<char*>(destination);
+
+        std::size_t totalReceivedBytes = 0;
+
+        while (totalReceivedBytes < size)
+        {
+            const int receivedBytes = recv(
+                socket_,
+                bytes + totalReceivedBytes,
+                static_cast<int>(
+                    size - totalReceivedBytes),
+                0);
+
+            if (receivedBytes == SOCKET_ERROR)
+            {
+                errorCode_ = WSAGetLastError();
+                return false;
+            }
+
+            if (receivedBytes == 0)
+            {
+                errorCode_ = 0;
+                return false;
+            }
+
+            totalReceivedBytes +=
+                static_cast<std::size_t>(
+                    receivedBytes);
+        }
+
+        return true;
+    }
+
     bool TcpClient::IsConnected() const noexcept
     {
         return socket_ != INVALID_SOCKET;
@@ -115,7 +165,19 @@ namespace DungeonSync::Network
 
     int TcpClient::ErrorCode() const noexcept
     {
-        return errorCode_;
+        return errorCode_.load();
+    }
+
+    void TcpClient::Shutdown() noexcept
+    {
+        if (socket_ == INVALID_SOCKET)
+        {
+            return;
+        }
+
+        shutdown(
+            socket_,
+            SD_BOTH);
     }
 
     void TcpClient::Disconnect() noexcept
@@ -124,6 +186,10 @@ namespace DungeonSync::Network
         {
             return;
         }
+
+        shutdown(
+            socket_,
+            SD_BOTH);
 
         closesocket(socket_);
         socket_ = INVALID_SOCKET;

@@ -29,6 +29,8 @@ add_executable(DungeonSyncClient WIN32
     Client/Rendering/RenderStatistics.h
     Client/Network/TcpClient.cpp
     Client/Network/TcpClient.h
+    Client/Network/ServerStateReceiver.cpp
+Client/Network/ServerStateReceiver.h
     Shared/Network/WinsockRuntime.cpp
     Shared/Network/WinsockRuntime.h
     Shared/Network/Packet.h

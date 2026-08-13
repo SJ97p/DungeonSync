@@ -9,7 +9,8 @@ namespace DungeonSync::Network
 {
     enum class PacketType : std::uint16_t
     {
-        PlayerMove = 1
+        PlayerMove = 1,
+        PlayerState = 2
     };
 
     struct PlayerMovePacket
@@ -21,9 +22,23 @@ namespace DungeonSync::Network
         std::uint32_t positionY{};
     };
 
+    struct PlayerStatePacket
+    {
+        std::uint16_t size{};
+        std::uint16_t type{};
+        std::uint32_t sequence{};
+        std::uint32_t positionX{};
+        std::uint32_t positionY{};
+        std::uint32_t accepted{};
+    };
+
     static_assert(
         sizeof(PlayerMovePacket) == 16,
         "PlayerMovePacket must be exactly 16 bytes.");
+
+    static_assert(
+        sizeof(PlayerStatePacket) == 20,
+        "PlayerStatePacket must be exactly 20 bytes.");
 
     [[nodiscard]]
     inline std::uint32_t EncodeFloat(float value) noexcept
@@ -66,4 +81,31 @@ namespace DungeonSync::Network
 
         return packet;
     }
+
+    [[nodiscard]]
+    inline PlayerStatePacket MakePlayerStatePacket(
+        std::uint32_t sequence,
+        float positionX,
+        float positionY,
+        bool accepted) noexcept
+    {
+        PlayerStatePacket packet{};
+
+        packet.size = htons(
+            static_cast<std::uint16_t>(
+                sizeof(PlayerStatePacket)));
+
+        packet.type = htons(
+            static_cast<std::uint16_t>(
+                PacketType::PlayerState));
+
+        packet.sequence = htonl(sequence);
+        packet.positionX = EncodeFloat(positionX);
+        packet.positionY = EncodeFloat(positionY);
+        packet.accepted = htonl(
+            accepted ? 1U : 0U);
+
+        return packet;
+    }
+
 }

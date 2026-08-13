@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <string_view>
+#include <atomic>
 
 namespace DungeonSync::Network
 {
@@ -30,15 +31,21 @@ namespace DungeonSync::Network
             std::size_t size) noexcept;
 
         [[nodiscard]]
+        bool Receive(
+            void* destination,
+            std::size_t size) noexcept;
+
+        [[nodiscard]]
         bool IsConnected() const noexcept;
 
         [[nodiscard]]
         int ErrorCode() const noexcept;
 
+        void Shutdown() noexcept;
         void Disconnect() noexcept;
 
     private:
         SOCKET socket_{ INVALID_SOCKET };
-        int errorCode_{};
+        std::atomic_int errorCode_{};
     };
 }

@@ -4,6 +4,50 @@
 
 #include <iostream>
 #include <cstdint>
+#include <chrono>
+#include <cmath>
+
+namespace
+{
+    [[nodiscard]]
+    bool SendAll(
+        SOCKET socket,
+        const void* data,
+        std::size_t size) noexcept
+    {
+        if (data == nullptr && size > 0)
+        {
+            return false;
+        }
+
+        const char* bytes =
+            static_cast<const char*>(data);
+
+        std::size_t totalSentBytes = 0;
+
+        while (totalSentBytes < size)
+        {
+            const int sentBytes = send(
+                socket,
+                bytes + totalSentBytes,
+                static_cast<int>(
+                    size - totalSentBytes),
+                0);
+
+            if (sentBytes == SOCKET_ERROR ||
+                sentBytes == 0)
+            {
+                return false;
+            }
+
+            totalSentBytes +=
+                static_cast<std::size_t>(
+                    sentBytes);
+        }
+
+        return true;
+    }
+}
 
 int main()
 {
@@ -56,6 +100,20 @@ int main()
     std::cout << "Receiving PlayerMovePacket stream...\n";
 
     std::uint32_t lastSequence = 0;
+
+    float approvedPositionX = 0.0F;
+    float approvedPositionY = 0.0F;
+
+    auto lastApprovedTime =
+        std::chrono::steady_clock::now();
+
+    constexpr float MaxMoveSpeed = 1.5F;
+    constexpr float MovementTolerance = 0.1F;
+
+    constexpr float MinWorldX = -1.5F;
+    constexpr float MaxWorldX = 1.5F;
+    constexpr float MinWorldY = -0.8F;
+    constexpr float MaxWorldY = 0.8F;
 
     while (true)
     {
@@ -128,8 +186,6 @@ int main()
             continue;
         }
 
-        lastSequence = sequence;
-
         const float positionX =
             DungeonSync::Network::DecodeFloat(
                 movePacket.positionX);
@@ -138,13 +194,130 @@ int main()
             DungeonSync::Network::DecodeFloat(
                 movePacket.positionY);
 
-        std::cout
-            << "Move"
-            << " | sequence: " << sequence
-            << " | position: ("
-            << positionX
-            << ", "
-            << positionY
-            << ")\n";
+        bool accepted = true;
+        const char* rejectionReason = nullptr;
+
+        if (!std::isfinite(positionX) ||
+            !std::isfinite(positionY))
+        {
+            accepted = false;
+            rejectionReason = "non-finite position";
+        }
+
+        const bool insideWorldBounds =
+            positionX >= MinWorldX &&
+            positionX <= MaxWorldX &&
+            positionY >= MinWorldY &&
+            positionY <= MaxWorldY;
+
+        if (accepted &&
+            !insideWorldBounds)
+        {
+            accepted = false;
+            rejectionReason = "out-of-bounds position";
+        }
+
+        const auto currentTime =
+            std::chrono::steady_clock::now();
+
+        if (accepted)
+        {
+            const std::chrono::duration<float> elapsed =
+                currentTime - lastApprovedTime;
+
+            constexpr float MaxValidationElapsedSeconds =
+                0.25F;
+
+            const float validationElapsedSeconds =
+                (std::min)(
+                    elapsed.count(),
+                    MaxValidationElapsedSeconds);
+
+            const float maxAllowedDistance =
+                MaxMoveSpeed *
+                validationElapsedSeconds +
+                MovementTolerance;
+
+            const float deltaX =
+                positionX - approvedPositionX;
+
+            const float deltaY =
+                positionY - approvedPositionY;
+
+            const float distanceSquared =
+                deltaX * deltaX +
+                deltaY * deltaY;
+
+            const float maxAllowedDistanceSquared =
+                maxAllowedDistance *
+                maxAllowedDistance;
+
+            if (distanceSquared >
+                maxAllowedDistanceSquared)
+            {
+                accepted = false;
+                rejectionReason = "excessive movement";
+            }
+        }
+
+        if (accepted)
+        {
+            approvedPositionX = positionX;
+            approvedPositionY = positionY;
+            lastApprovedTime = currentTime;
+
+            std::cout
+                << "Approved move"
+                << " | sequence: " << sequence
+                << " | position: ("
+                << approvedPositionX
+                << ", "
+                << approvedPositionY
+                << ")\n";
+        }
+        else
+        {
+            std::cerr
+                << "Rejected move"
+                << " | sequence: " << sequence
+                << " | reason: "
+                << rejectionReason
+                << " | proposed: ("
+                << positionX
+                << ", "
+                << positionY
+                << ")"
+                << " | approved: ("
+                << approvedPositionX
+                << ", "
+                << approvedPositionY
+                << ")\n";
+        }
+
+        lastSequence = sequence;
+
+        const DungeonSync::Network::PlayerStatePacket
+            statePacket =
+            DungeonSync::Network::MakePlayerStatePacket(
+                sequence,
+                approvedPositionX,
+                approvedPositionY,
+                accepted);
+
+        if (!SendAll(
+            clientSocket,
+            &statePacket,
+            sizeof(statePacket)))
+        {
+            std::cerr
+                << "Failed to send PlayerStatePacket"
+                << " | error: "
+                << WSAGetLastError()
+                << '\n';
+
+            closesocket(clientSocket);
+            return 1;
+        }
+
     }
 }
