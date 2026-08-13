@@ -33,5 +33,16 @@ namespace DungeonSync::Gameplay
             float damage,
             std::span<Monster> monsters,
             std::span<const std::size_t> candidateIndices) const;
+
+        [[nodiscard]]
+        AreaAttackResult ApplyConeAttackToCandidates(
+            const DirectX::XMFLOAT2& origin,
+            const DirectX::XMFLOAT2& direction,
+            float range,
+            float halfAngleRadians,
+            float damage,
+            std::span<Monster> monsters,
+            std::span<const std::size_t>
+            candidateIndices) const;
     };
 }

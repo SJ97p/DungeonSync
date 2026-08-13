@@ -121,7 +121,7 @@ namespace DungeonSync
         float serverLogElapsedSeconds = 0.0F;
 
         bool spaceWasDown = false;
-
+        bool coneAttackWasDown = false;
         bool restartWasDown = false;
 
 #ifndef NDEBUG
@@ -184,6 +184,16 @@ namespace DungeonSync
 
             spaceWasDown = spaceIsDown;
 
+            const bool coneAttackIsDown =
+                (GetAsyncKeyState('E') & 0x8000) != 0;
+
+            const bool coneAttackPressed =
+                coneAttackIsDown &&
+                !coneAttackWasDown;
+
+            coneAttackWasDown =
+                coneAttackIsDown;
+
             const bool restartIsDown =
                 (GetAsyncKeyState('R') & 0x8000) != 0;
 
@@ -213,7 +223,8 @@ namespace DungeonSync
                 frameElapsed.count(),
                 moveX,
                 moveY,
-                attackPressed);
+                attackPressed,
+                coneAttackPressed);
 
             networkSendElapsedSeconds +=
                 frameElapsed.count();

@@ -103,7 +103,8 @@ namespace DungeonSync::Presentation
         float deltaSeconds,
         float moveX,
         float moveY,
-        bool attackPressed)
+        bool attackPressed,
+        bool coneAttackPressed)
     {
         if (dungeonController_.ConsumeRoomChanged())
         {
@@ -111,6 +112,16 @@ namespace DungeonSync::Presentation
         }
 
         constexpr float PlayerMoveSpeed = 1.5F;
+
+        const float movementLengthSquared =
+            moveX * moveX +
+            moveY * moveY;
+
+        if (movementLengthSquared > 0.0F)
+        {
+            playerFacing_.x = moveX;
+            playerFacing_.y = moveY;
+        }
 
         playerPosition_.x +=
             moveX * PlayerMoveSpeed * deltaSeconds;
@@ -202,6 +213,7 @@ namespace DungeonSync::Presentation
         //    }
         //}
 
+        //Spacebar를 눌렀을 시 공격을 실행한다.
         if (attackPressed)
         {
             constexpr float AttackRange = 0.45F;
@@ -238,6 +250,57 @@ namespace DungeonSync::Presentation
                 playerPosition_,
                 monsters_);
 
+        }
+
+        //부채꼴의 스킬을 실행한다.
+        if (coneAttackPressed)
+        {
+            constexpr float ConeAttackRange = 0.9F;
+            constexpr float ConeAttackDamage = 50.0F;
+
+            constexpr float Pi =
+                3.14159265F;
+
+            constexpr float HalfAngleRadians =
+                45.0F * Pi / 180.0F;
+
+            const std::vector<std::size_t> candidates =
+                spatialGrid_.Query(
+                    playerPosition_,
+                    ConeAttackRange);
+
+            lastAttackResult_ =
+                combatSystem_.ApplyConeAttackToCandidates(
+                    playerPosition_,
+                    playerFacing_,
+                    ConeAttackRange,
+                    HalfAngleRadians,
+                    ConeAttackDamage,
+                    monsters_,
+                    candidates);
+
+            char debugMessage[256]{};
+
+            std::snprintf(
+                debugMessage,
+                sizeof(debugMessage),
+                "Cone attack"
+                " | candidates: %zu"
+                " | examined: %zu"
+                " | hits: %zu"
+                " | elapsed: %lld ns\n",
+                candidates.size(),
+                lastAttackResult_.examinedCount,
+                lastAttackResult_.hitCount,
+                static_cast<long long>(
+                    lastAttackResult_
+                    .elapsedNanoseconds));
+
+            OutputDebugStringA(debugMessage);
+
+            dungeonController_.Update(
+                playerPosition_,
+                monsters_);
         }
 
         std::size_t clearedRoomIndex = 0;

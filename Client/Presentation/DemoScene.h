@@ -23,7 +23,8 @@ namespace DungeonSync::Presentation
             float deltaSeconds,
             float moveX,
             float moveY,
-            bool attackPressed);
+            bool attackPressed,
+            bool coneAttackPressed);
 
         void RestartDungeon();
 
@@ -50,6 +51,11 @@ namespace DungeonSync::Presentation
         static constexpr std::size_t MonsterCount = 100;
 
         DirectX::XMFLOAT2 playerPosition_{};
+
+        DirectX::XMFLOAT2 playerFacing_{
+    0.0F,
+    1.0F
+        };
 
         std::array<Gameplay::Monster, MonsterCount>
             monsters_{};
