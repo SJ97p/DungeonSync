@@ -117,6 +117,9 @@ namespace DungeonSync
 
         std::uint32_t moveSequence = 0;
 
+        std::uint32_t lastLoggedServerSequence = 0;
+        float serverLogElapsedSeconds = 0.0F;
+
         bool spaceWasDown = false;
 
 #ifndef NDEBUG
@@ -132,6 +135,9 @@ namespace DungeonSync
                 currentTime - previousTime;
 
             previousTime = currentTime;
+
+            serverLogElapsedSeconds +=
+                frameElapsed.count();
 
             float moveX = 0.0F;
             float moveY = 0.0F;
@@ -263,23 +269,35 @@ namespace DungeonSync
                     serverState.accepted,
                     frameElapsed.count());
 
-                char stateMessage[256]{};
+                const bool shouldLogServerState =
+                    !serverState.accepted ||
+                    serverLogElapsedSeconds >= 1.0F;
 
-                std::snprintf(
-                    stateMessage,
-                    sizeof(stateMessage),
-                    "Server state"
-                    " | sequence: %u"
-                    " | accepted: %s"
-                    " | position: (%.3f, %.3f)\n",
-                    serverState.sequence,
-                    serverState.accepted
-                    ? "true"
-                    : "false",
-                    serverState.positionX,
-                    serverState.positionY);
+                if (shouldLogServerState)
+                {
+                    char stateMessage[256]{};
 
-                OutputDebugStringA(stateMessage);
+                    std::snprintf(
+                        stateMessage,
+                        sizeof(stateMessage),
+                        "Server state"
+                        " | sequence: %u"
+                        " | accepted: %s"
+                        " | position: (%.3f, %.3f)\n",
+                        serverState.sequence,
+                        serverState.accepted
+                        ? "true"
+                        : "false",
+                        serverState.positionX,
+                        serverState.positionY);
+
+                    OutputDebugStringA(stateMessage);
+
+                    lastLoggedServerSequence =
+                        serverState.sequence;
+
+                    serverLogElapsedSeconds = 0.0F;
+                }
             }
 
 

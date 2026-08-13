@@ -58,6 +58,8 @@ namespace DungeonSync::Presentation
             1 + MonsterCount>
             renderItems_{};
 
+        std::size_t visibleRenderItemCount_{};
+
         Rendering::Camera camera_{};
     };
 }

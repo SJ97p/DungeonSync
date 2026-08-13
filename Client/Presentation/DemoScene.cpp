@@ -44,18 +44,6 @@ namespace DungeonSync::Presentation
 
         spatialGrid_.Rebuild(monsters_);
 
-        for (std::size_t index = 0;
-            index < MonsterCount;
-            ++index)
-        {
-            renderItems_[index + 1].tintColor =
-                DirectX::XMFLOAT4{
-                    0.25F,
-                    0.45F,
-                    1.0F,
-                    1.0F
-            };
-        }
     }
 
     void DemoScene::Update(
@@ -130,6 +118,8 @@ OutputDebugStringA(debugMessage);
             0.0F
         };
 
+        visibleRenderItemCount_ = 0;
+
         const DirectX::XMMATRIX playerWorld =
             DirectX::XMMatrixScaling(
                 0.18F,
@@ -144,38 +134,18 @@ OutputDebugStringA(debugMessage);
             &renderItems_[0].world,
             playerWorld);
 
-        for (std::size_t index = 0;
-            index < MonsterCount;
-            ++index)
+        ++visibleRenderItemCount_;
+
+        for (const Gameplay::Monster& monster :
+            monsters_)
         {
-            const Gameplay::Monster& monster =
-                monsters_[index];
-
-            Rendering::RenderItem& renderItem =
-                renderItems_[index + 1];
-
             if (!monster.alive)
             {
-                const DirectX::XMMATRIX hiddenWorld =
-                    DirectX::XMMatrixScaling(
-                        0.0F,
-                        0.0F,
-                        0.0F);
-
-                DirectX::XMStoreFloat4x4(
-                    &renderItem.world,
-                    hiddenWorld);
-
-                renderItem.tintColor =
-                    DirectX::XMFLOAT4{
-                        0.0F,
-                        0.0F,
-                        0.0F,
-                        0.0F
-                };
-
                 continue;
             }
+
+            Rendering::RenderItem& renderItem =
+                renderItems_[visibleRenderItemCount_];
 
             const DirectX::XMFLOAT2& monsterPosition =
                 monster.position;
@@ -214,6 +184,8 @@ OutputDebugStringA(debugMessage);
                         1.0F
                 };
             }
+
+            ++visibleRenderItemCount_;
         }
     }
 
@@ -276,6 +248,9 @@ OutputDebugStringA(debugMessage);
     std::span<const Rendering::RenderItem>
         DemoScene::RenderItems() const noexcept
     {
-        return renderItems_;
+        return std::span<const Rendering::RenderItem>{
+            renderItems_.data(),
+                visibleRenderItemCount_
+        };
     }
 }
