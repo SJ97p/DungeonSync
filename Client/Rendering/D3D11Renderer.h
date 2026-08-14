@@ -15,6 +15,12 @@
 
 namespace DungeonSync::Rendering
 {
+    enum class SpriteSubmissionMode
+    {
+        InstancedBatch,
+        PerInstance
+    };
+
     class D3D11Renderer final
     {
     public:
@@ -37,7 +43,9 @@ namespace DungeonSync::Rendering
 
         void Render(
             const Camera& camera,
-            std::span<const RenderItem> renderItems);
+            std::span<const RenderItem> renderItems,
+            SpriteSubmissionMode submissionMode =
+            SpriteSubmissionMode::InstancedBatch);
 
     private:
         [[nodiscard]] bool CreateDeviceAndSwapChain(
@@ -53,7 +61,9 @@ namespace DungeonSync::Rendering
         [[nodiscard]] bool CreateShadersAndInputLayout();
         [[nodiscard]] bool CreateGroundShadersAndInputLayout();
         [[nodiscard]] bool CreateConstantBuffer();
-        [[nodiscard]] bool CreateInstanceBuffer();
+        [[nodiscard]]
+        bool EnsureInstanceBufferCapacity(
+            std::size_t requiredCapacity);
         [[nodiscard]] bool CreateTextureResources();
         [[nodiscard]] bool CreateSpriteSampler();
         [[nodiscard]] bool CreateGroundSampler();
@@ -89,7 +99,11 @@ namespace DungeonSync::Rendering
 
         D3D_FEATURE_LEVEL featureLevel_{};
 
-        static constexpr std::size_t MaxInstanceCount = 1024;
+        static constexpr std::size_t
+            InitialInstanceCapacity = 1024;
+
+        std::size_t instanceBufferCapacity_{};
+
         RenderStatistics statistics_{};
         std::uint32_t width_{};
         std::uint32_t height_{};

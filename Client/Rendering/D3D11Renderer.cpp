@@ -10,6 +10,8 @@
 #include <cstddef>
 #include <cstring>
 #include <algorithm>
+#include <limits>
+#include <chrono>
 
 using Microsoft::WRL::ComPtr;
 
@@ -228,7 +230,8 @@ namespace DungeonSync::Rendering
             return false;
         }
 
-        if (!CreateInstanceBuffer())
+        if (!EnsureInstanceBufferCapacity(
+            InitialInstanceCapacity))
         {
             return false;
         }
@@ -587,10 +590,14 @@ namespace DungeonSync::Rendering
 
     void D3D11Renderer::Render(
         const Camera& camera,
-        std::span<const RenderItem> renderItems)
+        std::span<const RenderItem> renderItems,
+        SpriteSubmissionMode submissionMode)
     {
         using namespace DirectX;
         statistics_ = {};
+
+        const auto renderSubmissionStart =
+            std::chrono::steady_clock::now();
 
         const XMVECTOR cameraPosition =
             XMLoadFloat3(&camera.position);
@@ -654,17 +661,60 @@ namespace DungeonSync::Rendering
             constantBuffer_.Get(),
             0);
 
+        statistics_.submittedInstanceCount =
+            renderItems.size();
+
+        if (!EnsureInstanceBufferCapacity(
+            renderItems.size()))
+        {
+            OutputDebugStringA(
+                "Failed to grow instance buffer."
+                " Rendering available instances only.\n");
+        }
+
         const std::size_t instanceCount =
-            std::min(
+            (std::min)(
                 renderItems.size(),
-                MaxInstanceCount);
+                instanceBufferCapacity_);
 
         statistics_.instanceCount =
             instanceCount;
 
+        statistics_.droppedInstanceCount =
+            renderItems.size() -
+            instanceCount;
+
+        statistics_.instanceBufferCapacity =
+            instanceBufferCapacity_;
+
         if (instanceCount == 0)
         {
+            const auto renderSubmissionEnd =
+                std::chrono::steady_clock::now();
+
+            statistics_.cpuSubmissionMilliseconds =
+                std::chrono::duration<
+                    float,
+                    std::milli>(
+                        renderSubmissionEnd -
+                        renderSubmissionStart)
+                    .count();
+
+            const auto presentStart =
+                std::chrono::steady_clock::now();
+
             swapChain_->Present(1, 0);
+
+            const auto presentEnd =
+                std::chrono::steady_clock::now();
+
+            statistics_.presentMilliseconds =
+                std::chrono::duration<
+                float,
+                std::milli>(
+                    presentEnd -
+                    presentStart)
+                .count();
             return;
         }
 
@@ -1017,18 +1067,68 @@ namespace DungeonSync::Rendering
             blendFactor,
             0xFFFFFFFF);
 
-        deviceContext_->DrawIndexedInstanced(
+        const UINT spriteIndexCount =
             static_cast<UINT>(
-                std::size(SpriteIndices)),
-            static_cast<UINT>(
-                instanceCount),
-            0,
-            0,
-            0);
-        ++statistics_.drawCallCount;
+                std::size(SpriteIndices));
 
-        // 9. 완성된 Back Buffer를 창에 표시
+        if (submissionMode ==
+            SpriteSubmissionMode::InstancedBatch)
+        {
+            deviceContext_->DrawIndexedInstanced(
+                spriteIndexCount,
+                static_cast<UINT>(instanceCount),
+                0,
+                0,
+                0);
+
+            ++statistics_.drawCallCount;
+        }
+        else
+        {
+            for (std::size_t instanceIndex = 0;
+                instanceIndex < instanceCount;
+                ++instanceIndex)
+            {
+                deviceContext_->DrawIndexedInstanced(
+                    spriteIndexCount,
+                    1,
+                    0,
+                    0,
+                    static_cast<UINT>(
+                        instanceIndex));
+
+                ++statistics_.drawCallCount;
+            }
+        }
+
+        // Measure CPU render command submission.
+        const auto renderSubmissionEnd =
+            std::chrono::steady_clock::now();
+
+        statistics_.cpuSubmissionMilliseconds =
+            std::chrono::duration<
+            float,
+            std::milli>(
+                renderSubmissionEnd -
+                renderSubmissionStart)
+            .count();
+
+        // Measure Present wait separately.
+        const auto presentStart =
+            std::chrono::steady_clock::now();
+
         swapChain_->Present(1, 0);
+
+        const auto presentEnd =
+            std::chrono::steady_clock::now();
+
+        statistics_.presentMilliseconds =
+            std::chrono::duration<
+            float,
+            std::milli>(
+                presentEnd -
+                presentStart)
+            .count();
     }
 
     const RenderStatistics&
@@ -1454,29 +1554,98 @@ namespace DungeonSync::Rendering
         return SUCCEEDED(result);
     }
 
-    bool D3D11Renderer::CreateInstanceBuffer()
+    bool D3D11Renderer::
+        EnsureInstanceBufferCapacity(
+            std::size_t requiredCapacity)
     {
-        D3D11_BUFFER_DESC bufferDescription{};
+        if (requiredCapacity <=
+            instanceBufferCapacity_)
+        {
+            return true;
+        }
 
-        bufferDescription.ByteWidth =
+        std::size_t newCapacity =
+            (std::max)(
+                InitialInstanceCapacity,
+                instanceBufferCapacity_);
+
+        while (newCapacity < requiredCapacity)
+        {
+            const std::size_t maximumSize =
+                (std::numeric_limits<
+                    std::size_t>::max)();
+
+            if (newCapacity >
+                maximumSize / 2)
+            {
+                return false;
+            }
+
+            newCapacity *= 2;
+        }
+
+        const std::size_t maximumBufferBytes =
+            (std::numeric_limits<UINT>::max)();
+
+        if (newCapacity >
+            maximumBufferBytes /
+            sizeof(InstanceData))
+        {
+            return false;
+        }
+
+        D3D11_BUFFER_DESC description{};
+
+        description.ByteWidth =
             static_cast<UINT>(
                 sizeof(InstanceData) *
-                MaxInstanceCount);
+                newCapacity);
 
-        bufferDescription.Usage =
+        description.Usage =
             D3D11_USAGE_DYNAMIC;
 
-        bufferDescription.BindFlags =
+        description.BindFlags =
             D3D11_BIND_VERTEX_BUFFER;
 
-        bufferDescription.CPUAccessFlags =
+        description.CPUAccessFlags =
             D3D11_CPU_ACCESS_WRITE;
 
-        const HRESULT result = device_->CreateBuffer(
-            &bufferDescription,
-            nullptr,
-            instanceBuffer_.ReleaseAndGetAddressOf());
+        ComPtr<ID3D11Buffer> newInstanceBuffer;
 
-        return SUCCEEDED(result);
+        const HRESULT result =
+            device_->CreateBuffer(
+                &description,
+                nullptr,
+                newInstanceBuffer
+                .ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        const std::size_t previousCapacity =
+            instanceBufferCapacity_;
+
+        instanceBuffer_.Swap(newInstanceBuffer);
+        instanceBufferCapacity_ = newCapacity;
+
+        char message[192]{};
+
+        std::snprintf(
+            message,
+            sizeof(message),
+            "Instance buffer resized"
+            " | previous: %zu"
+            " | current: %zu"
+            " | bytes: %zu\n",
+            previousCapacity,
+            instanceBufferCapacity_,
+            sizeof(InstanceData) *
+            instanceBufferCapacity_);
+
+        OutputDebugStringA(message);
+
+        return true;
     }
 }

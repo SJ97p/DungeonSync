@@ -8,6 +8,7 @@
 #include <cwchar>
 #include <iterator>
 #include <thread>
+#include <array>
 
 namespace
 {
@@ -128,6 +129,16 @@ namespace DungeonSync
         bool coneAttackWasDown = false;
         bool restartWasDown = false;
 
+        std::array<bool, 5>
+            stressKeyWasDown{};
+
+        bool submissionModeToggleWasDown = false;
+
+        Rendering::SpriteSubmissionMode
+            stressSubmissionMode =
+            Rendering::SpriteSubmissionMode::
+            InstancedBatch;
+
 #ifndef NDEBUG
         bool testKeyWasDown = false;
         bool hitchTestKeyWasDown = false;
@@ -217,6 +228,140 @@ namespace DungeonSync
                 !restartWasDown;
 
             restartWasDown = restartIsDown;
+
+            constexpr std::array<int, 5>
+                StressKeys{
+                    VK_F1,
+                    VK_F2,
+                    VK_F3,
+                    VK_F4,
+                    VK_F5
+            };
+
+            constexpr std::array<std::size_t, 5>
+                StressInstanceCounts{
+                    100,
+                    1000,
+                    3000,
+                    10000,
+                    0
+            };
+
+            for (std::size_t index = 0;
+                index < StressKeys.size();
+                ++index)
+            {
+                const bool keyIsDown =
+                    (GetAsyncKeyState(
+                        StressKeys[index]) &
+                        0x8000) != 0;
+
+                const bool keyPressed =
+                    keyIsDown &&
+                    !stressKeyWasDown[index];
+
+                stressKeyWasDown[index] =
+                    keyIsDown;
+
+                if (!keyPressed)
+                {
+                    continue;
+                }
+
+                const std::size_t requestedCount =
+                    StressInstanceCounts[index];
+
+                if (requestedCount == 0)
+                {
+                    renderingStressScene_.Disable();
+
+                    frameTimeProfiler_.Reset();
+                    cpuSubmissionProfiler_.Reset();
+                    presentProfiler_.Reset();
+                    statisticsElapsedSeconds = 0.0F;
+                    statisticsFrameCount = 0;
+
+                    OutputDebugStringA(
+                        "Rendering stress scene disabled.\n");
+
+                    continue;
+                }
+
+                renderingStressScene_.SetInstanceCount(
+                    requestedCount);
+
+                frameTimeProfiler_.Reset();
+                cpuSubmissionProfiler_.Reset();
+                presentProfiler_.Reset();
+                statisticsElapsedSeconds = 0.0F;
+                statisticsFrameCount = 0;
+
+                char stressMessage[128]{};
+
+                std::snprintf(
+                    stressMessage,
+                    sizeof(stressMessage),
+                    "Rendering stress scene enabled"
+                    " | instances: %zu\n",
+                    requestedCount);
+
+                OutputDebugStringA(stressMessage);
+            }
+
+            const bool submissionModeToggleIsDown =
+                (GetAsyncKeyState(VK_F6) &
+                    0x8000) != 0;
+
+            const bool submissionModeTogglePressed =
+                submissionModeToggleIsDown &&
+                !submissionModeToggleWasDown;
+
+            submissionModeToggleWasDown =
+                submissionModeToggleIsDown;
+
+            if (submissionModeTogglePressed)
+            {
+                if (!renderingStressScene_.IsActive())
+                {
+                    OutputDebugStringA(
+                        "F6 ignored."
+                        " Enable a stress scene first.\n");
+                }
+                else if (stressSubmissionMode ==
+                    Rendering::SpriteSubmissionMode::
+                    InstancedBatch)
+                {
+                    stressSubmissionMode =
+                        Rendering::SpriteSubmissionMode::
+                        PerInstance;
+
+                    frameTimeProfiler_.Reset();
+                    cpuSubmissionProfiler_.Reset();
+                    presentProfiler_.Reset();
+                    statisticsElapsedSeconds = 0.0F;
+                    statisticsFrameCount = 0;
+
+                    OutputDebugStringA(
+                        "Sprite submission mode"
+                        " | per-instance draws\n");
+                }
+                else
+                {
+                    stressSubmissionMode =
+                        Rendering::SpriteSubmissionMode::
+                        InstancedBatch;
+
+                    frameTimeProfiler_.Reset();
+                    cpuSubmissionProfiler_.Reset();
+                    presentProfiler_.Reset();
+                    statisticsElapsedSeconds = 0.0F;
+                    statisticsFrameCount = 0;
+
+                    OutputDebugStringA(
+                        "Sprite submission mode"
+                        " | instanced batch\n");
+                }
+            }
 
 #ifndef NDEBUG
             const bool testKeyIsDown =
@@ -364,9 +509,31 @@ namespace DungeonSync
             }
 
 
-            renderer_.Render(
-                demoScene_.GetCamera(),
-                demoScene_.RenderItems());
+            if (renderingStressScene_.IsActive())
+            {
+                renderer_.Render(
+                    demoScene_.GetCamera(),
+                    renderingStressScene_.RenderItems(),
+                    stressSubmissionMode);
+            }
+            else
+            {
+                renderer_.Render(
+                    demoScene_.GetCamera(),
+                    demoScene_.RenderItems());
+            }
+
+            const Rendering::RenderStatistics&
+                currentRenderStatistics =
+                renderer_.Statistics();
+
+            cpuSubmissionProfiler_.RecordMilliseconds(
+                currentRenderStatistics
+                .cpuSubmissionMilliseconds);
+
+            presentProfiler_.RecordMilliseconds(
+                currentRenderStatistics
+                .presentMilliseconds);
 
             statisticsElapsedSeconds +=
                 frameElapsed.count();
@@ -385,7 +552,17 @@ namespace DungeonSync
 
                 const Diagnostics::FrameTimeSnapshot
                     frameTimeSnapshot =
-                    frameTimeProfiler_.CaptureSnapshot();
+                        frameTimeProfiler_.CaptureSnapshot();
+
+                const Diagnostics::FrameTimeSnapshot
+                    cpuSubmissionSnapshot =
+                        cpuSubmissionProfiler_
+                        .CaptureSnapshot();
+
+                const Diagnostics::FrameTimeSnapshot
+                    presentSnapshot =
+                        presentProfiler_
+                        .CaptureSnapshot();
 
                 char message[512]{};
 
@@ -401,7 +578,14 @@ namespace DungeonSync
                     " | >16.67 ms: %zu/%zu"
                     " | >33.33 ms: %zu/%zu"
                     " | Draw Calls: %zu"
-                    " | Instances: %zu\n",
+                    " | Submitted: %zu"
+                    " | Rendered: %zu"
+                    " | Dropped: %zu"
+                    " | Capacity: %zu"
+                    " | CPU Avg/P95/P99:"
+                    " %.3f/%.3f/%.3f ms"
+                    " | Present Avg/P95/P99:"
+                    " %.3f/%.3f/%.3f ms\n",
                     framesPerSecond,
                     frameTimeSnapshot.averageMilliseconds,
                     frameTimeSnapshot.percentile95Milliseconds,
@@ -412,7 +596,16 @@ namespace DungeonSync
                     frameTimeSnapshot.framesOver33Milliseconds,
                     frameTimeSnapshot.sampleCount,
                     statistics.drawCallCount,
-                    statistics.instanceCount);
+                    statistics.submittedInstanceCount,
+                    statistics.instanceCount,
+                    statistics.droppedInstanceCount,
+                    statistics.instanceBufferCapacity,
+                    cpuSubmissionSnapshot.averageMilliseconds,
+                    cpuSubmissionSnapshot.percentile95Milliseconds,
+                    cpuSubmissionSnapshot.percentile99Milliseconds,
+                    presentSnapshot.averageMilliseconds,
+                    presentSnapshot.percentile95Milliseconds,
+                    presentSnapshot.percentile99Milliseconds);
 
                 OutputDebugStringA(message);
 

@@ -8,17 +8,25 @@ namespace DungeonSync::Diagnostics
     void FrameTimeProfiler::RecordFrame(
         float deltaSeconds) noexcept
     {
-        if (!std::isfinite(deltaSeconds) ||
-            deltaSeconds <= 0.0F)
+        constexpr float MillisecondsPerSecond =
+            1000.0F;
+
+        RecordMilliseconds(
+            deltaSeconds *
+            MillisecondsPerSecond);
+    }
+
+    void FrameTimeProfiler::RecordMilliseconds(
+        float milliseconds) noexcept
+    {
+        if (!std::isfinite(milliseconds) ||
+            milliseconds <= 0.0F)
         {
             return;
         }
 
-        constexpr float MillisecondsPerSecond =
-            1000.0F;
-
         frameTimesMilliseconds_[nextSampleIndex_] =
-            deltaSeconds * MillisecondsPerSecond;
+            milliseconds;
 
         nextSampleIndex_ =
             (nextSampleIndex_ + 1) %

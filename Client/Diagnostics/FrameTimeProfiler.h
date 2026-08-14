@@ -25,6 +25,9 @@ namespace DungeonSync::Diagnostics
 
         void RecordFrame(float deltaSeconds) noexcept;
 
+        void RecordMilliseconds(
+            float milliseconds) noexcept;
+
         [[nodiscard]]
         FrameTimeSnapshot
             CaptureSnapshot() const noexcept;
