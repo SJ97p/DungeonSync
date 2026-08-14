@@ -24,9 +24,7 @@ namespace DungeonSync::Rendering
             0.0F
         };
 
-        float fieldOfViewRadians{
-            DirectX::XM_PIDIV4
-        };
+        float orthographicHeight{ 4.0F };
 
         float nearPlane{ 0.1F };
         float farPlane{ 100.0F };

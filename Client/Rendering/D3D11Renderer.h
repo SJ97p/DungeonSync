@@ -48,11 +48,16 @@ namespace DungeonSync::Rendering
         [[nodiscard]] bool CreateRenderTarget();
         [[nodiscard]] bool CreateDepthBuffer();
         [[nodiscard]] bool CreateSpriteGeometryBuffers();
+        [[nodiscard]] bool CreateGroundGeometryBuffers();
+        [[nodiscard]] bool CreateBackgroundGeometryBuffers();
         [[nodiscard]] bool CreateShadersAndInputLayout();
+        [[nodiscard]] bool CreateGroundShadersAndInputLayout();
         [[nodiscard]] bool CreateConstantBuffer();
         [[nodiscard]] bool CreateInstanceBuffer();
         [[nodiscard]] bool CreateTextureResources();
         [[nodiscard]] bool CreateSpriteSampler();
+        [[nodiscard]] bool CreateGroundSampler();
+        [[nodiscard]] bool CreateSpriteBlendState();
 
         Microsoft::WRL::ComPtr<ID3D11Device> device_;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> deviceContext_;
@@ -62,14 +67,25 @@ namespace DungeonSync::Rendering
         Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthStencilView_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> groundVertexBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> groundIndexBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> backgroundVertexBuffer_;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> backgroundIndexBuffer_;
         Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
         Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
+        Microsoft::WRL::ComPtr<ID3D11VertexShader> groundVertexShader_;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> groundPixelShader_;
         Microsoft::WRL::ComPtr<ID3D11SamplerState> spriteSampler_;
         Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
+        Microsoft::WRL::ComPtr<ID3D11SamplerState> groundSampler_;
+        Microsoft::WRL::ComPtr<ID3D11BlendState> spriteBlendState_;
+        Microsoft::WRL::ComPtr<ID3D11InputLayout> groundInputLayout_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> instanceBuffer_;
         WicTextureLoader textureLoader_{};
         LoadedTexture spriteAtlas_{};
+        LoadedTexture groundTexture_{};
+        LoadedTexture backgroundTexture_{};
 
         D3D_FEATURE_LEVEL featureLevel_{};
 

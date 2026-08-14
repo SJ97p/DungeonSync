@@ -115,6 +115,12 @@ namespace DungeonSync::Presentation
         const float simulationDeltaSeconds =
             (std::min)(deltaSeconds, 0.05F);
 
+        attackEffectRemainingSeconds_ =
+            (std::max)(
+                0.0F,
+                attackEffectRemainingSeconds_ -
+                simulationDeltaSeconds);
+
         constexpr float PlayerMoveSpeed = 1.5F;
 
         const float movementLengthSquared =
@@ -125,6 +131,15 @@ namespace DungeonSync::Presentation
         {
             playerFacing_.x = moveX;
             playerFacing_.y = moveY;
+        }
+
+        if (moveX < 0.0F)
+        {
+            playerVisualFacingX_ = -1.0F;
+        }
+        else if (moveX > 0.0F)
+        {
+            playerVisualFacingX_ = 1.0F;
         }
 
         playerPosition_.x +=
@@ -138,7 +153,7 @@ namespace DungeonSync::Presentation
             simulationDeltaSeconds;
 
         constexpr float MovementLimitX = 1.5F;
-        constexpr float MovementLimitY = 1.5F;
+        constexpr float MovementLimitDepth = 1.5F;
 
         playerPosition_.x = std::clamp(
             playerPosition_.x,
@@ -147,8 +162,8 @@ namespace DungeonSync::Presentation
 
         playerPosition_.y = std::clamp(
             playerPosition_.y,
-            -MovementLimitY,
-            MovementLimitY);
+            -MovementLimitDepth,
+            MovementLimitDepth);
 
         constexpr float JumpInitialVelocity = 2.8F;
         constexpr float Gravity = -8.0F;
@@ -255,6 +270,10 @@ namespace DungeonSync::Presentation
         if (attackPressed &&
             playerIsGrounded_)
         {
+            attackEffectRemainingSeconds_ = 0.15F;
+            attackEffectPosition_ = playerPosition_;
+            attackEffectFacingX_ = playerVisualFacingX_;
+
             constexpr float AttackRange = 0.45F;
             constexpr float AttackDamage = 50.0F;
 
@@ -365,30 +384,31 @@ namespace DungeonSync::Presentation
                 "Dungeon cleared. Press R to restart.\n");
         }
 
-        camera_.position = DirectX::XMFLOAT3{
-    playerPosition_.x,
-    playerPosition_.y,
-    -3.0F
+        camera_.position =
+            DirectX::XMFLOAT3{
+                playerPosition_.x,
+                3.0F,
+                -5.0F
         };
 
-        camera_.target = DirectX::XMFLOAT3{
-            playerPosition_.x,
-            playerPosition_.y,
-            0.0F
+        camera_.target =
+            DirectX::XMFLOAT3{
+                playerPosition_.x,
+                0.7F,
+                0.0F
         };
 
         visibleRenderItemCount_ = 0;
 
         const DirectX::XMMATRIX playerWorld =
             DirectX::XMMatrixScaling(
-                0.18F,
-                0.18F,
-                0.18F) *
+                0.70F,
+                0.70F,
+                1.0F) *
             DirectX::XMMatrixTranslation(
                 playerPosition_.x,
-                playerPosition_.y +
                 playerJumpHeight_,
-                0.0F);
+                playerPosition_.y);
 
         DirectX::XMStoreFloat4x4(
             &renderItems_[0].world,
@@ -402,13 +422,26 @@ namespace DungeonSync::Presentation
                 1.0F
         };
 
-        renderItems_[0].uvRectangle =
-            DirectX::XMFLOAT4{
-                0.0F,
-                0.0F,
-                0.5F,
-                0.5F
-        };
+        if (playerVisualFacingX_ > 0.0F)
+        {
+            renderItems_[0].uvRectangle =
+                DirectX::XMFLOAT4{
+                    0.0F,
+                    0.0F,
+                    0.5F,
+                    0.5F
+            };
+        }
+        else
+        {
+            renderItems_[0].uvRectangle =
+                DirectX::XMFLOAT4{
+                    0.5F,
+                    0.0F,
+                    -0.5F,
+                    0.5F
+            };
+        }
 
         ++visibleRenderItemCount_;
 
@@ -436,13 +469,13 @@ namespace DungeonSync::Presentation
 
             const DirectX::XMMATRIX monsterWorld =
                 DirectX::XMMatrixScaling(
-                    0.12F,
-                    0.12F,
-                    0.12F) *
+                    0.42F,
+                    0.42F,
+                    1.0F) *
                 DirectX::XMMatrixTranslation(
                     monsterPosition.x,
-                    monsterPosition.y,
-                    0.0F);
+                    0.0F,
+                    monsterPosition.y);
 
             DirectX::XMStoreFloat4x4(
                 &renderItem.world,
@@ -471,6 +504,62 @@ namespace DungeonSync::Presentation
 
             ++visibleRenderItemCount_;
         }
+
+        if (attackEffectRemainingSeconds_ > 0.0F)
+        {
+            Rendering::RenderItem& effectItem =
+                renderItems_[visibleRenderItemCount_];
+
+            const float horizontalDirection =
+                attackEffectFacingX_;
+
+            const DirectX::XMMATRIX effectWorld =
+                DirectX::XMMatrixScaling(
+                    0.85F,
+                    0.85F,
+                    1.0F) *
+                DirectX::XMMatrixTranslation(
+                    attackEffectPosition_.x +
+                    horizontalDirection * 0.28F,
+                    0.08F,
+                    attackEffectPosition_.y -
+                    0.02F);
+
+            DirectX::XMStoreFloat4x4(
+                &effectItem.world,
+                effectWorld);
+
+            effectItem.tintColor =
+                DirectX::XMFLOAT4{
+                    1.0F,
+                    0.85F,
+                    0.45F,
+                    0.85F
+            };
+
+            if (horizontalDirection > 0.0F)
+            {
+                effectItem.uvRectangle =
+                    DirectX::XMFLOAT4{
+                        0.75F,
+                        0.75F,
+                        -0.25F,
+                        0.25F
+                };
+            }
+            else
+            {
+                effectItem.uvRectangle =
+                    DirectX::XMFLOAT4{
+                        0.5F,
+                        0.75F,
+                        0.25F,
+                        0.25F
+                };
+            }
+
+            ++visibleRenderItemCount_;
+        }
     }
 
     void DemoScene::RestartDungeon()
@@ -483,9 +572,12 @@ namespace DungeonSync::Presentation
                 0.0F
         };
 
+        playerVisualFacingX_ = 1.0F;
+        attackEffectFacingX_ = 1.0F;
         playerJumpHeight_ = 0.0F;
         playerVerticalVelocity_ = 0.0F;
         playerIsGrounded_ = true;
+        attackEffectRemainingSeconds_ = 0.0F;
 
         PrepareCurrentRoom();
 

@@ -67,11 +67,18 @@ namespace DungeonSync::Presentation
         float playerJumpHeight_{};
         float playerVerticalVelocity_{};
         bool playerIsGrounded_{ true };
+        float attackEffectRemainingSeconds_{};
+
+        DirectX::XMFLOAT2 attackEffectPosition_{};
+
+        float attackEffectFacingX_{ 1.0F };
 
         DirectX::XMFLOAT2 playerFacing_{
     0.0F,
     1.0F
         };
+
+        float playerVisualFacingX_{ 1.0F };
 
         std::array<Gameplay::Monster, MonsterCount>
             monsters_{};
@@ -84,7 +91,7 @@ namespace DungeonSync::Presentation
 
         std::array<
             Rendering::RenderItem,
-            1 + MonsterCount>
+            1 + MonsterCount + 1>
             renderItems_{};
 
         std::size_t visibleRenderItemCount_{};

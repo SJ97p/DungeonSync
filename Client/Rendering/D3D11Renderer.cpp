@@ -19,24 +19,74 @@ namespace
     const DungeonSync::Rendering::Vertex
         SpriteVertices[]{
         {
-            { -0.5F, -0.5F, 0.0F },
+            { -0.5F, 0.0F, 0.0F },
             { 0.0F, 1.0F }
         },
         {
-            { -0.5F, 0.5F, 0.0F },
+            { -0.5F, 1.0F, 0.0F },
             { 0.0F, 0.0F }
         },
         {
-            { 0.5F, 0.5F, 0.0F },
+            { 0.5F, 1.0F, 0.0F },
             { 1.0F, 0.0F }
         },
         {
-            { 0.5F, -0.5F, 0.0F },
+            { 0.5F, 0.0F, 0.0F },
             { 1.0F, 1.0F }
         }
     };
 
     constexpr std::uint16_t SpriteIndices[]{
+        0, 1, 2,
+        0, 2, 3
+    };
+
+    const DungeonSync::Rendering::Vertex
+        GroundVertices[]{
+        {
+            { -8.0F, 0.0F, -3.0F },
+            { 0.0F, 0.0F }
+        },
+        {
+            { -8.0F, 0.0F, 5.0F },
+            { 0.0F, 3.0F }
+        },
+        {
+            { 8.0F, 0.0F, 5.0F },
+            { 6.0F, 3.0F }
+        },
+        {
+            { 8.0F, 0.0F, -3.0F },
+            { 6.0F, 0.0F }
+        }
+    };
+
+    constexpr std::uint16_t GroundIndices[]{
+        0, 1, 2,
+        0, 2, 3
+    };
+
+    const DungeonSync::Rendering::Vertex
+        BackgroundVertices[]{
+        {
+            { -8.0F, -4.0F, 2.0F },
+            { 0.0F, 1.0F }
+        },
+        {
+            { -8.0F, 4.0F, 2.0F },
+            { 0.0F, 0.0F }
+        },
+        {
+            { 8.0F, 4.0F, 2.0F },
+            { 1.0F, 0.0F }
+        },
+        {
+            { 8.0F, -4.0F, 2.0F },
+            { 1.0F, 1.0F }
+        }
+    };
+
+    constexpr std::uint16_t BackgroundIndices[]{
         0, 1, 2,
         0, 2, 3
     };
@@ -132,6 +182,22 @@ namespace DungeonSync::Rendering
             return false;
         }
 
+        if (!CreateGroundSampler())
+        {
+            OutputDebugStringA(
+                "Failed to create ground sampler.\n");
+
+            return false;
+        }
+
+        if (!CreateSpriteBlendState())
+        {
+            OutputDebugStringA(
+                "Failed to create sprite blend state.\n");
+
+            return false;
+        }
+
         if (!CreateRenderTarget())
         {
             return false;
@@ -147,6 +213,16 @@ namespace DungeonSync::Rendering
             return false;
         }
 
+        if (!CreateGroundGeometryBuffers())
+        {
+            return false;
+        }
+
+        if (!CreateBackgroundGeometryBuffers())
+        {
+            return false;
+        }
+
         if (!CreateConstantBuffer())
         {
             return false;
@@ -158,6 +234,11 @@ namespace DungeonSync::Rendering
         }
 
         if (!CreateShadersAndInputLayout())
+        {
+            return false;
+        }
+
+        if (!CreateGroundShadersAndInputLayout())
         {
             return false;
         }
@@ -326,6 +407,49 @@ namespace DungeonSync::Rendering
             return false;
         }
 
+        const std::filesystem::path groundTexturePath{
+    L"Assets/Textures/Environment/"
+    L"floor_stone_a.png"
+        };
+
+        if (!textureLoader_.LoadFromFile(
+            *device_.Get(),
+            groundTexturePath,
+            groundTexture_))
+        {
+            OutputDebugStringW(
+                L"Failed to load ground texture: ");
+
+            OutputDebugStringW(
+                groundTexturePath.c_str());
+
+            OutputDebugStringW(L"\n");
+
+            return false;
+        }
+
+        const std::filesystem::path
+            backgroundTexturePath{
+                L"Assets/Textures/Environment/"
+                L"aqueduct_far_background.png"
+        };
+
+        if (!textureLoader_.LoadFromFile(
+            *device_.Get(),
+            backgroundTexturePath,
+            backgroundTexture_))
+        {
+            OutputDebugStringW(
+                L"Failed to load background texture: ");
+
+            OutputDebugStringW(
+                backgroundTexturePath.c_str());
+
+            OutputDebugStringW(L"\n");
+
+            return false;
+        }
+
         char message[128]{};
 
         std::snprintf(
@@ -336,6 +460,28 @@ namespace DungeonSync::Rendering
             " | height: %u\n",
             spriteAtlas_.width,
             spriteAtlas_.height);
+
+        OutputDebugStringA(message);
+
+        std::snprintf(
+            message,
+            sizeof(message),
+            "Loaded ground texture"
+            " | width: %u"
+            " | height: %u\n",
+            groundTexture_.width,
+            groundTexture_.height);
+
+        OutputDebugStringA(message);
+
+        std::snprintf(
+            message,
+            sizeof(message),
+            "Loaded background texture"
+            " | width: %u"
+            " | height: %u\n",
+            backgroundTexture_.width,
+            backgroundTexture_.height);
 
         OutputDebugStringA(message);
 
@@ -371,6 +517,74 @@ namespace DungeonSync::Rendering
         return SUCCEEDED(result);
     }
 
+    bool D3D11Renderer::CreateGroundSampler()
+    {
+        D3D11_SAMPLER_DESC description{};
+
+        description.Filter =
+            D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+
+        description.AddressU =
+            D3D11_TEXTURE_ADDRESS_WRAP;
+
+        description.AddressV =
+            D3D11_TEXTURE_ADDRESS_WRAP;
+
+        description.AddressW =
+            D3D11_TEXTURE_ADDRESS_WRAP;
+
+        description.MinLOD = 0.0F;
+        description.MaxLOD =
+            D3D11_FLOAT32_MAX;
+
+        const HRESULT result =
+            device_->CreateSamplerState(
+                &description,
+                groundSampler_
+                .ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::CreateSpriteBlendState()
+    {
+        D3D11_BLEND_DESC description{};
+
+        description.RenderTarget[0]
+            .BlendEnable = TRUE;
+
+        description.RenderTarget[0]
+            .SrcBlend = D3D11_BLEND_SRC_ALPHA;
+
+        description.RenderTarget[0]
+            .DestBlend =
+            D3D11_BLEND_INV_SRC_ALPHA;
+
+        description.RenderTarget[0]
+            .BlendOp = D3D11_BLEND_OP_ADD;
+
+        description.RenderTarget[0]
+            .SrcBlendAlpha = D3D11_BLEND_ONE;
+
+        description.RenderTarget[0]
+            .DestBlendAlpha = D3D11_BLEND_ZERO;
+
+        description.RenderTarget[0]
+            .BlendOpAlpha = D3D11_BLEND_OP_ADD;
+
+        description.RenderTarget[0]
+            .RenderTargetWriteMask =
+            D3D11_COLOR_WRITE_ENABLE_ALL;
+
+        const HRESULT result =
+            device_->CreateBlendState(
+                &description,
+                spriteBlendState_
+                .ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
     void D3D11Renderer::Render(
         const Camera& camera,
         std::span<const RenderItem> renderItems)
@@ -396,10 +610,14 @@ namespace DungeonSync::Rendering
             static_cast<float>(width_) /
             static_cast<float>(height_);
 
+        const float orthographicWidth =
+            camera.orthographicHeight *
+            aspectRatio;
+
         const XMMATRIX projection =
-            XMMatrixPerspectiveFovLH(
-                camera.fieldOfViewRadians,
-                aspectRatio,
+            XMMatrixOrthographicLH(
+                orthographicWidth,
+                camera.orthographicHeight,
                 camera.nearPlane,
                 camera.farPlane);
 
@@ -547,6 +765,169 @@ namespace DungeonSync::Rendering
             1.0F,
             0);
 
+        deviceContext_->OMSetBlendState(
+            nullptr,
+            nullptr,
+            0xFFFFFFFF);
+
+        // Background pass
+        ID3D11Buffer* backgroundVertexBuffers[]{
+            backgroundVertexBuffer_.Get()
+        };
+
+        constexpr UINT backgroundStrides[]{
+            sizeof(Vertex)
+        };
+
+        constexpr UINT backgroundOffsets[]{
+            0
+        };
+
+        deviceContext_->IASetVertexBuffers(
+            0,
+            1,
+            backgroundVertexBuffers,
+            backgroundStrides,
+            backgroundOffsets);
+
+        deviceContext_->IASetIndexBuffer(
+            backgroundIndexBuffer_.Get(),
+            DXGI_FORMAT_R16_UINT,
+            0);
+
+        deviceContext_->IASetInputLayout(
+            groundInputLayout_.Get());
+
+        deviceContext_->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        ID3D11Buffer* backgroundConstantBuffers[]{
+            constantBuffer_.Get()
+        };
+
+        deviceContext_->VSSetConstantBuffers(
+            0,
+            1,
+            backgroundConstantBuffers);
+
+        deviceContext_->VSSetShader(
+            groundVertexShader_.Get(),
+            nullptr,
+            0);
+
+        deviceContext_->PSSetShader(
+            groundPixelShader_.Get(),
+            nullptr,
+            0);
+
+        ID3D11ShaderResourceView*
+            backgroundShaderResources[]{
+                backgroundTexture_
+                    .shaderResourceView
+                    .Get()
+        };
+
+        deviceContext_->PSSetShaderResources(
+            0,
+            1,
+            backgroundShaderResources);
+
+        ID3D11SamplerState* backgroundSamplers[]{
+            spriteSampler_.Get()
+        };
+
+        deviceContext_->PSSetSamplers(
+            0,
+            1,
+            backgroundSamplers);
+
+        deviceContext_->DrawIndexed(
+            static_cast<UINT>(
+                std::size(BackgroundIndices)),
+            0,
+            0);
+
+        ++statistics_.drawCallCount;
+
+        // Ground pass
+        ID3D11Buffer* groundVertexBuffers[]{
+            groundVertexBuffer_.Get()
+        };
+
+        constexpr UINT groundStrides[]{
+            sizeof(Vertex)
+        };
+
+        constexpr UINT groundOffsets[]{
+            0
+        };
+
+        deviceContext_->IASetVertexBuffers(
+            0,
+            1,
+            groundVertexBuffers,
+            groundStrides,
+            groundOffsets);
+
+        deviceContext_->IASetIndexBuffer(
+            groundIndexBuffer_.Get(),
+            DXGI_FORMAT_R16_UINT,
+            0);
+
+        deviceContext_->IASetInputLayout(
+            groundInputLayout_.Get());
+
+        deviceContext_->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        ID3D11Buffer* groundConstantBuffers[]{
+            constantBuffer_.Get()
+        };
+
+        deviceContext_->VSSetConstantBuffers(
+            0,
+            1,
+            groundConstantBuffers);
+
+        deviceContext_->VSSetShader(
+            groundVertexShader_.Get(),
+            nullptr,
+            0);
+
+        deviceContext_->PSSetShader(
+            groundPixelShader_.Get(),
+            nullptr,
+            0);
+
+        ID3D11ShaderResourceView*
+            groundShaderResources[]{
+                groundTexture_
+                    .shaderResourceView
+                    .Get()
+        };
+
+        deviceContext_->PSSetShaderResources(
+            0,
+            1,
+            groundShaderResources);
+
+        ID3D11SamplerState* groundSamplers[]{
+            groundSampler_.Get()
+        };
+
+        deviceContext_->PSSetSamplers(
+            0,
+            1,
+            groundSamplers);
+
+        deviceContext_->DrawIndexed(
+            static_cast<UINT>(
+                std::size(GroundIndices)),
+            0,
+            0);
+
+        ++statistics_.drawCallCount;
+
         // 4. Vertex Buffer와 Index Buffer 연결
         ID3D11Buffer* vertexBuffers[]{
             vertexBuffer_.Get(),
@@ -624,6 +1005,18 @@ namespace DungeonSync::Rendering
             1,
             samplers);
 
+        constexpr float blendFactor[]{
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F
+        };
+
+        deviceContext_->OMSetBlendState(
+            spriteBlendState_.Get(),
+            blendFactor,
+            0xFFFFFFFF);
+
         deviceContext_->DrawIndexedInstanced(
             static_cast<UINT>(
                 std::size(SpriteIndices)),
@@ -687,6 +1080,115 @@ namespace DungeonSync::Rendering
             &indexBufferDescription,
             &indexInitialData,
             indexBuffer_.ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::CreateGroundGeometryBuffers()
+    {
+        D3D11_BUFFER_DESC vertexBufferDescription{};
+
+        vertexBufferDescription.ByteWidth =
+            static_cast<UINT>(
+                sizeof(GroundVertices));
+
+        vertexBufferDescription.Usage =
+            D3D11_USAGE_IMMUTABLE;
+
+        vertexBufferDescription.BindFlags =
+            D3D11_BIND_VERTEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA vertexInitialData{};
+        vertexInitialData.pSysMem =
+            GroundVertices;
+
+        HRESULT result = device_->CreateBuffer(
+            &vertexBufferDescription,
+            &vertexInitialData,
+            groundVertexBuffer_
+            .ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        D3D11_BUFFER_DESC indexBufferDescription{};
+
+        indexBufferDescription.ByteWidth =
+            static_cast<UINT>(
+                sizeof(GroundIndices));
+
+        indexBufferDescription.Usage =
+            D3D11_USAGE_IMMUTABLE;
+
+        indexBufferDescription.BindFlags =
+            D3D11_BIND_INDEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA indexInitialData{};
+        indexInitialData.pSysMem =
+            GroundIndices;
+
+        result = device_->CreateBuffer(
+            &indexBufferDescription,
+            &indexInitialData,
+            groundIndexBuffer_
+            .ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::
+        CreateBackgroundGeometryBuffers()
+    {
+        D3D11_BUFFER_DESC vertexDescription{};
+
+        vertexDescription.ByteWidth =
+            static_cast<UINT>(
+                sizeof(BackgroundVertices));
+
+        vertexDescription.Usage =
+            D3D11_USAGE_IMMUTABLE;
+
+        vertexDescription.BindFlags =
+            D3D11_BIND_VERTEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA vertexData{};
+        vertexData.pSysMem =
+            BackgroundVertices;
+
+        HRESULT result = device_->CreateBuffer(
+            &vertexDescription,
+            &vertexData,
+            backgroundVertexBuffer_
+            .ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        D3D11_BUFFER_DESC indexDescription{};
+
+        indexDescription.ByteWidth =
+            static_cast<UINT>(
+                sizeof(BackgroundIndices));
+
+        indexDescription.Usage =
+            D3D11_USAGE_IMMUTABLE;
+
+        indexDescription.BindFlags =
+            D3D11_BIND_INDEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA indexData{};
+        indexData.pSysMem =
+            BackgroundIndices;
+
+        result = device_->CreateBuffer(
+            &indexDescription,
+            &indexData,
+            backgroundIndexBuffer_
+            .ReleaseAndGetAddressOf());
 
         return SUCCEEDED(result);
     }
@@ -835,6 +1337,99 @@ namespace DungeonSync::Rendering
             vertexShaderBytecode->GetBufferPointer(),
             vertexShaderBytecode->GetBufferSize(),
             inputLayout_.ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::
+        CreateGroundShadersAndInputLayout()
+    {
+        constexpr wchar_t ShaderPath[] =
+            L"Client/Rendering/Shaders/Ground.hlsl";
+
+        ComPtr<ID3DBlob> vertexShaderBytecode;
+        ComPtr<ID3DBlob> pixelShaderBytecode;
+
+        HRESULT result = CompileShader(
+            ShaderPath,
+            "VSMain",
+            "vs_5_0",
+            vertexShaderBytecode);
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        result = CompileShader(
+            ShaderPath,
+            "PSMain",
+            "ps_5_0",
+            pixelShaderBytecode);
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        result = device_->CreateVertexShader(
+            vertexShaderBytecode->GetBufferPointer(),
+            vertexShaderBytecode->GetBufferSize(),
+            nullptr,
+            groundVertexShader_
+            .ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        result = device_->CreatePixelShader(
+            pixelShaderBytecode->GetBufferPointer(),
+            pixelShaderBytecode->GetBufferSize(),
+            nullptr,
+            groundPixelShader_
+            .ReleaseAndGetAddressOf());
+
+        if (FAILED(result))
+        {
+            return false;
+        }
+
+        const D3D11_INPUT_ELEMENT_DESC
+            inputElements[]{
+            {
+                "POSITION",
+                0,
+                DXGI_FORMAT_R32G32B32_FLOAT,
+                0,
+                static_cast<UINT>(
+                    offsetof(Vertex, position)),
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0
+            },
+            {
+                "TEXCOORD",
+                0,
+                DXGI_FORMAT_R32G32_FLOAT,
+                0,
+                static_cast<UINT>(
+                    offsetof(
+                        Vertex,
+                        textureCoordinate)),
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0
+            }
+        };
+
+        result = device_->CreateInputLayout(
+            inputElements,
+            static_cast<UINT>(
+                std::size(inputElements)),
+            vertexShaderBytecode->GetBufferPointer(),
+            vertexShaderBytecode->GetBufferSize(),
+            groundInputLayout_
+            .ReleaseAndGetAddressOf());
 
         return SUCCEEDED(result);
     }
