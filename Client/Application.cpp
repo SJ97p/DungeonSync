@@ -44,6 +44,8 @@ namespace DungeonSync
         }
 
         constexpr std::uint16_t ServerPort = 27015;
+        std::uint64_t
+            lastRecordedGpuTimingSampleSerial = 0;
 
         if (!tcpClient_.Connect(
             "127.0.0.1",
@@ -278,6 +280,8 @@ namespace DungeonSync
                     frameTimeProfiler_.Reset();
                     cpuSubmissionProfiler_.Reset();
                     presentProfiler_.Reset();
+                    gpuProfiler_.Reset();
+                    renderer_.BeginGpuTimingGeneration();
                     statisticsElapsedSeconds = 0.0F;
                     statisticsFrameCount = 0;
 
@@ -293,6 +297,8 @@ namespace DungeonSync
                 frameTimeProfiler_.Reset();
                 cpuSubmissionProfiler_.Reset();
                 presentProfiler_.Reset();
+                gpuProfiler_.Reset();
+                renderer_.BeginGpuTimingGeneration();
                 statisticsElapsedSeconds = 0.0F;
                 statisticsFrameCount = 0;
 
@@ -338,6 +344,8 @@ namespace DungeonSync
                     frameTimeProfiler_.Reset();
                     cpuSubmissionProfiler_.Reset();
                     presentProfiler_.Reset();
+                    gpuProfiler_.Reset();
+                    renderer_.BeginGpuTimingGeneration();
                     statisticsElapsedSeconds = 0.0F;
                     statisticsFrameCount = 0;
 
@@ -354,6 +362,8 @@ namespace DungeonSync
                     frameTimeProfiler_.Reset();
                     cpuSubmissionProfiler_.Reset();
                     presentProfiler_.Reset();
+                    gpuProfiler_.Reset();
+                    renderer_.BeginGpuTimingGeneration();
                     statisticsElapsedSeconds = 0.0F;
                     statisticsFrameCount = 0;
 
@@ -535,6 +545,20 @@ namespace DungeonSync
                 currentRenderStatistics
                 .presentMilliseconds);
 
+            if (currentRenderStatistics.gpuTimingValid &&
+                currentRenderStatistics
+                .gpuTimingSampleSerial !=
+                lastRecordedGpuTimingSampleSerial)
+            {
+                gpuProfiler_.RecordMilliseconds(
+                    currentRenderStatistics
+                    .gpuMilliseconds);
+
+                lastRecordedGpuTimingSampleSerial =
+                    currentRenderStatistics
+                    .gpuTimingSampleSerial;
+            }
+
             statisticsElapsedSeconds +=
                 frameElapsed.count();
 
@@ -564,6 +588,10 @@ namespace DungeonSync
                         presentProfiler_
                         .CaptureSnapshot();
 
+                const Diagnostics::FrameTimeSnapshot
+                    gpuSnapshot =
+                    gpuProfiler_.CaptureSnapshot();
+
                 char message[512]{};
 
                 std::snprintf(
@@ -585,7 +613,10 @@ namespace DungeonSync
                     " | CPU Avg/P95/P99:"
                     " %.3f/%.3f/%.3f ms"
                     " | Present Avg/P95/P99:"
-                    " %.3f/%.3f/%.3f ms\n",
+                    " %.3f/%.3f/%.3f ms"
+                    " | GPU Avg/P95/P99:"
+                    " %.3f/%.3f/%.3f ms"
+                    " | GPU Samples: %zu\n",
                     framesPerSecond,
                     frameTimeSnapshot.averageMilliseconds,
                     frameTimeSnapshot.percentile95Milliseconds,
@@ -605,7 +636,11 @@ namespace DungeonSync
                     cpuSubmissionSnapshot.percentile99Milliseconds,
                     presentSnapshot.averageMilliseconds,
                     presentSnapshot.percentile95Milliseconds,
-                    presentSnapshot.percentile99Milliseconds);
+                    presentSnapshot.percentile99Milliseconds,
+                    gpuSnapshot.averageMilliseconds,
+                    gpuSnapshot.percentile95Milliseconds,
+                    gpuSnapshot.percentile99Milliseconds,
+                    gpuSnapshot.sampleCount);
 
                 OutputDebugStringA(message);
 

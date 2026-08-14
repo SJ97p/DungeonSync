@@ -41,6 +41,8 @@ namespace DungeonSync
             cpuSubmissionProfiler_;
         Diagnostics::FrameTimeProfiler
             presentProfiler_;
+        Diagnostics::FrameTimeProfiler
+            gpuProfiler_;
         Diagnostics::RenderingStressScene renderingStressScene_;
         Presentation::DemoScene demoScene_;
 

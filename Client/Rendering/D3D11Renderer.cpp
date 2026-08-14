@@ -200,6 +200,14 @@ namespace DungeonSync::Rendering
             return false;
         }
 
+        if (!CreateGpuTimingQueries())
+        {
+            OutputDebugStringA(
+                "Failed to create GPU timing queries.\n");
+
+            return false;
+        }
+
         if (!CreateRenderTarget())
         {
             return false;
@@ -596,6 +604,17 @@ namespace DungeonSync::Rendering
         using namespace DirectX;
         statistics_ = {};
 
+        ResolveGpuTimingQueries();
+
+        statistics_.gpuMilliseconds =
+            latestGpuMilliseconds_;
+
+        statistics_.gpuTimingValid =
+            latestGpuTimingValid_;
+
+        statistics_.gpuTimingSampleSerial =
+            gpuTimingSampleSerial_;
+
         const auto renderSubmissionStart =
             std::chrono::steady_clock::now();
 
@@ -786,6 +805,11 @@ namespace DungeonSync::Rendering
         deviceContext_->Unmap(
             instanceBuffer_.Get(),
             0);
+
+        const bool gpuTimingStarted =
+            BeginGpuTimingQuery();
+
+        (void)gpuTimingStarted;
 
         // 3. Back Buffer를 렌더 타깃으로 연결하고 배경 지우기
         constexpr float backgroundColor[]{
@@ -1101,6 +1125,8 @@ namespace DungeonSync::Rendering
             }
         }
 
+        EndGpuTimingQuery();
+
         // Measure CPU render command submission.
         const auto renderSubmissionEnd =
             std::chrono::steady_clock::now();
@@ -1135,6 +1161,20 @@ namespace DungeonSync::Rendering
         D3D11Renderer::Statistics() const noexcept
     {
         return statistics_;
+    }
+
+    void D3D11Renderer::
+        BeginGpuTimingGeneration() noexcept
+    {
+        ++gpuTimingGeneration_;
+
+        if (gpuTimingGeneration_ == 0)
+        {
+            gpuTimingGeneration_ = 1;
+        }
+
+        latestGpuMilliseconds_ = 0.0F;
+        latestGpuTimingValid_ = false;
     }
 
     bool D3D11Renderer::CreateSpriteGeometryBuffers()
@@ -1552,6 +1592,219 @@ namespace DungeonSync::Rendering
             constantBuffer_.ReleaseAndGetAddressOf());
 
         return SUCCEEDED(result);
+    }
+
+    bool D3D11Renderer::CreateGpuTimingQueries()
+    {
+        for (GpuTimingQuerySet& querySet :
+            gpuTimingQuerySets_)
+        {
+            D3D11_QUERY_DESC disjointDescription{};
+            disjointDescription.Query =
+                D3D11_QUERY_TIMESTAMP_DISJOINT;
+
+            HRESULT result = device_->CreateQuery(
+                &disjointDescription,
+                querySet.disjointQuery
+                .ReleaseAndGetAddressOf());
+
+            if (FAILED(result))
+            {
+                return false;
+            }
+
+            D3D11_QUERY_DESC timestampDescription{};
+            timestampDescription.Query =
+                D3D11_QUERY_TIMESTAMP;
+
+            result = device_->CreateQuery(
+                &timestampDescription,
+                querySet.startTimestampQuery
+                .ReleaseAndGetAddressOf());
+
+            if (FAILED(result))
+            {
+                return false;
+            }
+
+            result = device_->CreateQuery(
+                &timestampDescription,
+                querySet.endTimestampQuery
+                .ReleaseAndGetAddressOf());
+
+            if (FAILED(result))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    void D3D11Renderer::
+        ResolveGpuTimingQueries() noexcept
+    {
+        for (GpuTimingQuerySet& querySet :
+            gpuTimingQuerySets_)
+        {
+            if (!querySet.pending)
+            {
+                continue;
+            }
+
+            D3D11_QUERY_DATA_TIMESTAMP_DISJOINT
+                disjointData{};
+
+            const HRESULT disjointResult =
+                deviceContext_->GetData(
+                    querySet.disjointQuery.Get(),
+                    &disjointData,
+                    sizeof(disjointData),
+                    D3D11_ASYNC_GETDATA_DONOTFLUSH);
+
+            if (disjointResult == S_FALSE)
+            {
+                continue;
+            }
+
+            if (FAILED(disjointResult))
+            {
+                querySet.pending = false;
+                continue;
+            }
+
+            UINT64 startTimestamp = 0;
+            UINT64 endTimestamp = 0;
+
+            const HRESULT startResult =
+                deviceContext_->GetData(
+                    querySet.startTimestampQuery.Get(),
+                    &startTimestamp,
+                    sizeof(startTimestamp),
+                    D3D11_ASYNC_GETDATA_DONOTFLUSH);
+
+            const HRESULT endResult =
+                deviceContext_->GetData(
+                    querySet.endTimestampQuery.Get(),
+                    &endTimestamp,
+                    sizeof(endTimestamp),
+                    D3D11_ASYNC_GETDATA_DONOTFLUSH);
+
+            if (startResult == S_FALSE ||
+                endResult == S_FALSE)
+            {
+                continue;
+            }
+
+            querySet.pending = false;
+
+            if (FAILED(startResult) ||
+                FAILED(endResult) ||
+                disjointData.Disjoint ||
+                disjointData.Frequency == 0 ||
+                endTimestamp < startTimestamp)
+            {
+                continue;
+            }
+
+            constexpr double
+                MillisecondsPerSecond = 1000.0;
+
+            const double elapsedTicks =
+                static_cast<double>(
+                    endTimestamp -
+                    startTimestamp);
+
+            if (querySet.generation !=
+                gpuTimingGeneration_)
+            {
+                continue;
+            }
+
+            latestGpuMilliseconds_ =
+                static_cast<float>(
+                    elapsedTicks *
+                    MillisecondsPerSecond /
+                    static_cast<double>(
+                        disjointData.Frequency));
+
+            latestGpuTimingValid_ = true;
+
+            ++gpuTimingSampleSerial_;
+
+            return;
+        }
+    }
+
+    bool D3D11Renderer::
+        BeginGpuTimingQuery() noexcept
+    {
+        if (gpuTimingQueryActive_)
+        {
+            return false;
+        }
+
+        for (std::size_t offset = 0;
+            offset < GpuTimingQuerySetCount;
+            ++offset)
+        {
+            const std::size_t queryIndex =
+                (gpuTimingWriteIndex_ + offset) %
+                GpuTimingQuerySetCount;
+
+            GpuTimingQuerySet& querySet =
+                gpuTimingQuerySets_[queryIndex];
+
+            if (querySet.pending)
+            {
+                continue;
+            }
+
+            activeGpuTimingQueryIndex_ =
+                queryIndex;
+
+            querySet.generation =
+                gpuTimingGeneration_;
+
+            deviceContext_->Begin(
+                querySet.disjointQuery.Get());
+
+            deviceContext_->End(
+                querySet.startTimestampQuery.Get());
+
+            gpuTimingQueryActive_ = true;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    void D3D11Renderer::
+        EndGpuTimingQuery() noexcept
+    {
+        if (!gpuTimingQueryActive_)
+        {
+            return;
+        }
+
+        GpuTimingQuerySet& querySet =
+            gpuTimingQuerySets_[
+                activeGpuTimingQueryIndex_];
+
+        deviceContext_->End(
+            querySet.endTimestampQuery.Get());
+
+        deviceContext_->End(
+            querySet.disjointQuery.Get());
+
+        querySet.pending = true;
+
+        gpuTimingWriteIndex_ =
+            (activeGpuTimingQueryIndex_ + 1) %
+            GpuTimingQuerySetCount;
+
+        gpuTimingQueryActive_ = false;
     }
 
     bool D3D11Renderer::

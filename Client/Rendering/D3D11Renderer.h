@@ -12,6 +12,7 @@
 #include <span>
 #include <cstdint>
 #include <cstddef>
+#include <array>
 
 namespace DungeonSync::Rendering
 {
@@ -41,6 +42,8 @@ namespace DungeonSync::Rendering
         const RenderStatistics&
             Statistics() const noexcept;
 
+        void BeginGpuTimingGeneration() noexcept;
+
         void Render(
             const Camera& camera,
             std::span<const RenderItem> renderItems,
@@ -48,6 +51,21 @@ namespace DungeonSync::Rendering
             SpriteSubmissionMode::InstancedBatch);
 
     private:
+        struct GpuTimingQuerySet
+        {
+            Microsoft::WRL::ComPtr<ID3D11Query>
+                disjointQuery;
+
+            Microsoft::WRL::ComPtr<ID3D11Query>
+                startTimestampQuery;
+
+            Microsoft::WRL::ComPtr<ID3D11Query>
+                endTimestampQuery;
+
+            std::uint64_t generation{};
+            bool pending{};
+        };
+
         [[nodiscard]] bool CreateDeviceAndSwapChain(
             HWND window,
             std::uint32_t width,
@@ -68,6 +86,31 @@ namespace DungeonSync::Rendering
         [[nodiscard]] bool CreateSpriteSampler();
         [[nodiscard]] bool CreateGroundSampler();
         [[nodiscard]] bool CreateSpriteBlendState();
+        [[nodiscard]]
+        bool CreateGpuTimingQueries();
+
+        void ResolveGpuTimingQueries() noexcept;
+
+        [[nodiscard]]
+        bool BeginGpuTimingQuery() noexcept;
+
+        void EndGpuTimingQuery() noexcept;
+        static constexpr std::size_t
+            GpuTimingQuerySetCount = 4;
+
+        std::array<
+            GpuTimingQuerySet,
+            GpuTimingQuerySetCount>
+            gpuTimingQuerySets_{};
+
+        std::size_t gpuTimingWriteIndex_{};
+        std::size_t activeGpuTimingQueryIndex_{};
+        bool gpuTimingQueryActive_{};
+
+        std::uint64_t gpuTimingGeneration_{ 1 };
+        std::uint64_t gpuTimingSampleSerial_{};
+        float latestGpuMilliseconds_{};
+        bool latestGpuTimingValid_{};
 
         Microsoft::WRL::ComPtr<ID3D11Device> device_;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> deviceContext_;

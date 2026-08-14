@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 namespace DungeonSync::Rendering
 {
@@ -15,5 +16,8 @@ namespace DungeonSync::Rendering
 
         float cpuSubmissionMilliseconds{};
         float presentMilliseconds{};
+        float gpuMilliseconds{};
+        bool gpuTimingValid{};
+        std::uint64_t gpuTimingSampleSerial{};
     };
 }
