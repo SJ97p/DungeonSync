@@ -6,6 +6,7 @@
 #include "Network/TcpClient.h"
 #include "Network/ServerStateReceiver.h"
 #include "../Shared/Network/WinsockRuntime.h"
+#include "Diagnostics/FrameTimeProfiler.h"
 
 #include <WinSock2.h>
 #include <Windows.h>
@@ -34,6 +35,7 @@ namespace DungeonSync
 
         Platform::Window window_;
         Rendering::D3D11Renderer renderer_;
+        Diagnostics::FrameTimeProfiler frameTimeProfiler_;
         Presentation::DemoScene demoScene_;
 
         int showCommand_{};

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cwchar>
 #include <iterator>
+#include <thread>
 
 namespace
 {
@@ -129,6 +130,7 @@ namespace DungeonSync
 
 #ifndef NDEBUG
         bool testKeyWasDown = false;
+        bool hitchTestKeyWasDown = false;
 #endif
 
         while (window_.ProcessMessages())
@@ -140,6 +142,8 @@ namespace DungeonSync
                 currentTime - previousTime;
 
             previousTime = currentTime;
+            frameTimeProfiler_.RecordFrame(
+                frameElapsed.count());
 
             serverLogElapsedSeconds +=
                 frameElapsed.count();
@@ -223,6 +227,25 @@ namespace DungeonSync
                 !testKeyWasDown;
 
             testKeyWasDown = testKeyIsDown;
+
+            const bool hitchTestKeyIsDown =
+                (GetAsyncKeyState('H') & 0x8000) != 0;
+
+            const bool hitchTestPressed =
+                hitchTestKeyIsDown &&
+                !hitchTestKeyWasDown;
+
+            hitchTestKeyWasDown =
+                hitchTestKeyIsDown;
+
+            if (hitchTestPressed)
+            {
+                OutputDebugStringA(
+                    "Simulating a 50 ms frame hitch.\n");
+
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(50));
+            }
 #endif
 
             if (restartPressed)
@@ -360,13 +383,34 @@ namespace DungeonSync
                 const Rendering::RenderStatistics& statistics =
                     renderer_.Statistics();
 
-                char message[256]{};
+                const Diagnostics::FrameTimeSnapshot
+                    frameTimeSnapshot =
+                    frameTimeProfiler_.CaptureSnapshot();
+
+                char message[512]{};
 
                 std::snprintf(
                     message,
                     sizeof(message),
-                    "Render - FPS: %.1f, Draw Calls: %zu, Instances: %zu\n",
+                    "Performance"
+                    " | FPS: %.1f"
+                    " | Avg: %.3f ms"
+                    " | P95: %.3f ms"
+                    " | P99: %.3f ms"
+                    " | Max: %.3f ms"
+                    " | >16.67 ms: %zu/%zu"
+                    " | >33.33 ms: %zu/%zu"
+                    " | Draw Calls: %zu"
+                    " | Instances: %zu\n",
                     framesPerSecond,
+                    frameTimeSnapshot.averageMilliseconds,
+                    frameTimeSnapshot.percentile95Milliseconds,
+                    frameTimeSnapshot.percentile99Milliseconds,
+                    frameTimeSnapshot.maximumMilliseconds,
+                    frameTimeSnapshot.framesOver16Milliseconds,
+                    frameTimeSnapshot.sampleCount,
+                    frameTimeSnapshot.framesOver33Milliseconds,
+                    frameTimeSnapshot.sampleCount,
                     statistics.drawCallCount,
                     statistics.instanceCount);
 
