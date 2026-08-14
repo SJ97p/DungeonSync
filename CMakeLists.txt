@@ -42,6 +42,11 @@ add_executable(DungeonSyncClient WIN32
     Client/Diagnostics/FrameTimeProfiler.h
     Client/Diagnostics/RenderingStressScene.cpp
     Client/Diagnostics/RenderingStressScene.h
+    Client/Diagnostics/BenchmarkResult.h
+    Client/Diagnostics/BenchmarkCsvWriter.cpp
+    Client/Diagnostics/BenchmarkCsvWriter.h
+    Client/Diagnostics/BenchmarkSession.cpp
+    Client/Diagnostics/BenchmarkSession.h
     Shared/Network/WinsockRuntime.cpp
     Shared/Network/WinsockRuntime.h
     Shared/Network/Packet.h

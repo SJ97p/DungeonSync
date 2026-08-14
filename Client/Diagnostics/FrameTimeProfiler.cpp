@@ -125,6 +125,12 @@ namespace DungeonSync::Diagnostics
         return snapshot;
     }
 
+    std::size_t FrameTimeProfiler::SampleCount()
+        const noexcept
+    {
+        return sampleCount_;
+    }
+
     void FrameTimeProfiler::Reset() noexcept
     {
         frameTimesMilliseconds_ = {};

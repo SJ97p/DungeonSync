@@ -32,6 +32,9 @@ namespace DungeonSync::Diagnostics
         FrameTimeSnapshot
             CaptureSnapshot() const noexcept;
 
+        [[nodiscard]]
+        std::size_t SampleCount() const noexcept;
+
         void Reset() noexcept;
 
     private:

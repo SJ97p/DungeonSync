@@ -8,6 +8,8 @@
 #include "../Shared/Network/WinsockRuntime.h"
 #include "Diagnostics/FrameTimeProfiler.h"
 #include "Diagnostics/RenderingStressScene.h"
+#include "Diagnostics/BenchmarkSession.h"
+#include "Diagnostics/BenchmarkCsvWriter.h"
 
 #include <WinSock2.h>
 #include <Windows.h>
@@ -44,6 +46,8 @@ namespace DungeonSync
         Diagnostics::FrameTimeProfiler
             gpuProfiler_;
         Diagnostics::RenderingStressScene renderingStressScene_;
+        Diagnostics::BenchmarkSession
+            benchmarkSession_;
         Presentation::DemoScene demoScene_;
 
         int showCommand_{};

@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "../Shared/Network/Packet.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <cstdio>
@@ -130,6 +131,8 @@ namespace DungeonSync
         bool jumpWasDown = false;
         bool coneAttackWasDown = false;
         bool restartWasDown = false;
+        bool benchmarkStartWasDown = false;
+        bool benchmarkCancelWasDown = false;
 
         std::array<bool, 5>
             stressKeyWasDown{};
@@ -145,6 +148,72 @@ namespace DungeonSync
         bool testKeyWasDown = false;
         bool hitchTestKeyWasDown = false;
 #endif
+
+        const auto resetBenchmarkProfilers =
+            [this,
+            &statisticsElapsedSeconds,
+            &statisticsFrameCount]()
+            {
+                frameTimeProfiler_.Reset();
+                cpuSubmissionProfiler_.Reset();
+                presentProfiler_.Reset();
+                gpuProfiler_.Reset();
+
+                renderer_.BeginGpuTimingGeneration();
+
+                statisticsElapsedSeconds = 0.0F;
+                statisticsFrameCount = 0;
+            };
+
+        const auto applyBenchmarkScenario =
+            [this, &stressSubmissionMode]()
+            {
+                const Diagnostics::BenchmarkScenario&
+                    scenario =
+                    benchmarkSession_.CurrentScenario();
+
+                renderingStressScene_.SetInstanceCount(
+                    scenario.instanceCount);
+
+                if (scenario.submissionMode ==
+                    Diagnostics::BenchmarkSubmissionMode::
+                    InstancedBatch)
+                {
+                    stressSubmissionMode =
+                        Rendering::SpriteSubmissionMode::
+                        InstancedBatch;
+                }
+                else
+                {
+                    stressSubmissionMode =
+                        Rendering::SpriteSubmissionMode::
+                        PerInstance;
+                }
+
+                renderer_.BeginGpuTimingGeneration();
+
+                char message[256]{};
+
+                std::snprintf(
+                    message,
+                    sizeof(message),
+                    "Benchmark scenario %zu/%zu"
+                    " | instances: %zu"
+                    " | mode: %s"
+                    " | warmup: %.1f seconds\n",
+                    benchmarkSession_.CurrentScenarioNumber(),
+                    Diagnostics::BenchmarkSession::ScenarioCount,
+                    scenario.instanceCount,
+                    scenario.submissionMode ==
+                    Diagnostics::BenchmarkSubmissionMode::
+                    InstancedBatch
+                    ? "instanced"
+                    : "per-instance",
+                    Diagnostics::BenchmarkSession::
+                    WarmupSeconds);
+
+                OutputDebugStringA(message);
+            };
 
         while (window_.ProcessMessages())
         {
@@ -262,6 +331,11 @@ namespace DungeonSync
                     keyIsDown &&
                     !stressKeyWasDown[index];
 
+                if (benchmarkSession_.IsActive())
+                {
+                    continue;
+                }
+
                 stressKeyWasDown[index] =
                     keyIsDown;
 
@@ -325,7 +399,8 @@ namespace DungeonSync
             submissionModeToggleWasDown =
                 submissionModeToggleIsDown;
 
-            if (submissionModeTogglePressed)
+            if (submissionModeTogglePressed &&
+                !benchmarkSession_.IsActive())
             {
                 if (!renderingStressScene_.IsActive())
                 {
@@ -370,6 +445,203 @@ namespace DungeonSync
                     OutputDebugStringA(
                         "Sprite submission mode"
                         " | instanced batch\n");
+                }
+            }
+
+            const bool benchmarkStartIsDown =
+                (GetAsyncKeyState(VK_F8) &
+                    0x8000) != 0;
+
+            const bool benchmarkStartPressed =
+                benchmarkStartIsDown &&
+                !benchmarkStartWasDown;
+
+            benchmarkStartWasDown =
+                benchmarkStartIsDown;
+
+            const bool benchmarkCancelIsDown =
+                (GetAsyncKeyState(VK_F9) &
+                    0x8000) != 0;
+
+            const bool benchmarkCancelPressed =
+                benchmarkCancelIsDown &&
+                !benchmarkCancelWasDown;
+
+            benchmarkCancelWasDown =
+                benchmarkCancelIsDown;
+
+            if (benchmarkStartPressed &&
+                !benchmarkSession_.IsActive())
+            {
+                benchmarkSession_.Start();
+                applyBenchmarkScenario();
+
+                OutputDebugStringA(
+                    "Automated benchmark started."
+                    " Press F9 to cancel.\n");
+            }
+
+            if (benchmarkCancelPressed &&
+                benchmarkSession_.IsActive())
+            {
+                benchmarkSession_.Stop();
+                renderingStressScene_.Disable();
+
+                stressSubmissionMode =
+                    Rendering::SpriteSubmissionMode::
+                    InstancedBatch;
+
+                resetBenchmarkProfilers();
+
+                OutputDebugStringA(
+                    "Automated benchmark cancelled.\n");
+            }
+
+            std::size_t collectedBenchmarkSamples =
+                frameTimeProfiler_.SampleCount();
+
+            collectedBenchmarkSamples =
+                (std::min)(
+                    collectedBenchmarkSamples,
+                    cpuSubmissionProfiler_.SampleCount());
+
+            collectedBenchmarkSamples =
+                (std::min)(
+                    collectedBenchmarkSamples,
+                    presentProfiler_.SampleCount());
+
+            collectedBenchmarkSamples =
+                (std::min)(
+                    collectedBenchmarkSamples,
+                    gpuProfiler_.SampleCount());
+
+            const Diagnostics::BenchmarkSessionEvent
+                benchmarkEvent =
+                benchmarkSession_.Update(
+                    frameElapsed.count(),
+                    collectedBenchmarkSamples);
+
+            if (benchmarkEvent ==
+                Diagnostics::BenchmarkSessionEvent::
+                MeasurementStarted)
+            {
+                resetBenchmarkProfilers();
+
+                char measurementMessage[160]{};
+
+                std::snprintf(
+                    measurementMessage,
+                    sizeof(measurementMessage),
+                    "Benchmark measurement started"
+                    " | target samples: %zu\n",
+                    Diagnostics::BenchmarkSession::
+                    TargetSampleCount);
+
+                OutputDebugStringA(measurementMessage);
+            }
+            else if (benchmarkEvent ==
+                Diagnostics::BenchmarkSessionEvent::
+                MeasurementFinished)
+            {
+                const Diagnostics::BenchmarkScenario&
+                    scenario =
+                    benchmarkSession_.CurrentScenario();
+
+                const Rendering::RenderStatistics&
+                    benchmarkRenderStatistics =
+                    renderer_.Statistics();
+
+                Diagnostics::BenchmarkResult result{};
+
+                result.scenarioName =
+                    "sprite_submission";
+
+                result.submissionMode =
+                    scenario.submissionMode ==
+                    Diagnostics::BenchmarkSubmissionMode::
+                    InstancedBatch
+                    ? "instanced"
+                    : "per_instance";
+
+#ifdef NDEBUG
+                result.buildConfiguration = "Release";
+#else
+                result.buildConfiguration = "Debug";
+#endif
+
+                result.instanceCount =
+                    benchmarkRenderStatistics.instanceCount;
+
+                result.drawCallCount =
+                    benchmarkRenderStatistics.drawCallCount;
+
+                result.droppedInstanceCount =
+                    benchmarkRenderStatistics
+                    .droppedInstanceCount;
+
+                result.instanceBufferCapacity =
+                    benchmarkRenderStatistics
+                    .instanceBufferCapacity;
+
+                result.frameTime =
+                    frameTimeProfiler_.CaptureSnapshot();
+
+                result.cpuSubmissionTime =
+                    cpuSubmissionProfiler_
+                    .CaptureSnapshot();
+
+                result.gpuTime =
+                    gpuProfiler_.CaptureSnapshot();
+
+                result.presentTime =
+                    presentProfiler_.CaptureSnapshot();
+
+                const bool saved =
+                    Diagnostics::BenchmarkCsvWriter::Append(
+                        "Benchmarks/results.csv",
+                        result);
+
+                if (saved)
+                {
+                    char savedMessage[256]{};
+
+                    std::snprintf(
+                        savedMessage,
+                        sizeof(savedMessage),
+                        "Benchmark result saved"
+                        " | scenario: %zu/%zu"
+                        " | instances: %zu"
+                        " | mode: %s\n",
+                        benchmarkSession_
+                        .CurrentScenarioNumber(),
+                        Diagnostics::BenchmarkSession::
+                        ScenarioCount,
+                        scenario.instanceCount,
+                        result.submissionMode.c_str());
+
+                    OutputDebugStringA(savedMessage);
+                }
+                else
+                {
+                    OutputDebugStringA(
+                        "Failed to save benchmark result.\n");
+                }
+
+                if (benchmarkSession_.AdvanceAfterResult())
+                {
+                    applyBenchmarkScenario();
+                }
+                else
+                {
+                    renderingStressScene_.Disable();
+
+                    stressSubmissionMode =
+                        Rendering::SpriteSubmissionMode::
+                        InstancedBatch;
+
+                    OutputDebugStringA(
+                        "Automated benchmark completed."
+                        " Results: Benchmarks/results.csv\n");
                 }
             }
 
