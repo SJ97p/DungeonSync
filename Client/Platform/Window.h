@@ -28,6 +28,9 @@ namespace DungeonSync::Platform
         [[nodiscard]] std::uint32_t ClientWidth() const noexcept;
         [[nodiscard]] std::uint32_t ClientHeight() const noexcept;
 
+        void SetTitle(
+            const wchar_t* title) noexcept;
+
     private:
         static LRESULT CALLBACK WindowProcedure(
             HWND window,

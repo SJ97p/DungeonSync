@@ -27,6 +27,9 @@ namespace DungeonSync::Gameplay
         std::size_t CurrentRoomIndex() const noexcept;
 
         [[nodiscard]]
+        std::size_t RoomCount() const noexcept;
+
+        [[nodiscard]]
         bool IsDungeonCleared() const noexcept;
 
         [[nodiscard]]
@@ -52,11 +55,12 @@ namespace DungeonSync::Gameplay
             const DirectX::XMFLOAT2&
             playerPosition) const noexcept;
 
-        static constexpr std::size_t RoomCount = 3;
+        static constexpr std::size_t TotalRoomCount = 3;
 
-        std::array<DungeonRoom, RoomCount> rooms_{};
+        std::array<DungeonRoom, TotalRoomCount> rooms_{};
 
         std::size_t currentRoomIndex_{};
+
         bool dungeonCleared_{};
         bool roomChanged_{ true };
 

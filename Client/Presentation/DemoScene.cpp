@@ -213,7 +213,7 @@ namespace DungeonSync::Presentation
         //    }
         //}
 
-        //Spacebar를 눌렀을 시 공격을 실행한다.
+        //Attack after Spacebar
         if (attackPressed)
         {
             constexpr float AttackRange = 0.45F;
@@ -252,7 +252,7 @@ namespace DungeonSync::Presentation
 
         }
 
-        //부채꼴의 스킬을 실행한다.
+        //Attack after E
         if (coneAttackPressed)
         {
             constexpr float ConeAttackRange = 0.9F;
@@ -475,6 +475,32 @@ namespace DungeonSync::Presentation
 
         playerPosition_.y +=
             deltaY * correctionRatio;
+    }
+
+    std::size_t
+        DemoScene::CurrentRoomNumber() const noexcept
+    {
+        return
+            dungeonController_.CurrentRoomIndex() + 1;
+    }
+
+    std::size_t
+        DemoScene::RoomCount() const noexcept
+    {
+        return dungeonController_.RoomCount();
+    }
+
+    std::size_t
+        DemoScene::AliveMonsterCount() const noexcept
+    {
+        return
+            dungeonController_.AliveMonsterCount(
+                monsters_);
+    }
+
+    bool DemoScene::IsDungeonCleared() const noexcept
+    {
+        return dungeonController_.IsDungeonCleared();
     }
 
     const Rendering::Camera&

@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstdint>
+#include <cwchar>
+#include <iterator>
 
 namespace
 {
@@ -359,6 +361,46 @@ namespace DungeonSync
                     statistics.instanceCount);
 
                 OutputDebugStringA(message);
+
+                wchar_t windowTitle[256]{};
+
+                if (demoScene_.IsDungeonCleared())
+                {
+                    std::swprintf(
+                        windowTitle,
+                        std::size(windowTitle),
+                        L"DungeonSync"
+                        L" | DUNGEON CLEARED"
+                        L" | PRESS R"
+                        L" | FPS %.0f"
+                        L" | DRAW %zu"
+                        L" | INSTANCES %zu"
+                        L" | SERVER CONNECTED",
+                        framesPerSecond,
+                        statistics.drawCallCount,
+                        statistics.instanceCount);
+                }
+                else
+                {
+                    std::swprintf(
+                        windowTitle,
+                        std::size(windowTitle),
+                        L"DungeonSync"
+                        L" | ROOM %zu/%zu"
+                        L" | MONSTERS %zu"
+                        L" | FPS %.0f"
+                        L" | DRAW %zu"
+                        L" | INSTANCES %zu"
+                        L" | SERVER CONNECTED",
+                        demoScene_.CurrentRoomNumber(),
+                        demoScene_.RoomCount(),
+                        demoScene_.AliveMonsterCount(),
+                        framesPerSecond,
+                        statistics.drawCallCount,
+                        statistics.instanceCount);
+                }
+
+                window_.SetTitle(windowTitle);
 
                 statisticsElapsedSeconds = 0.0F;
                 statisticsFrameCount = 0;

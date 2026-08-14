@@ -39,6 +39,18 @@ namespace DungeonSync::Presentation
             float deltaSeconds) noexcept;
 
         [[nodiscard]]
+        std::size_t CurrentRoomNumber() const noexcept;
+
+        [[nodiscard]]
+        std::size_t RoomCount() const noexcept;
+
+        [[nodiscard]]
+        std::size_t AliveMonsterCount() const noexcept;
+
+        [[nodiscard]]
+        bool IsDungeonCleared() const noexcept;
+
+        [[nodiscard]]
         const Rendering::Camera& GetCamera() const noexcept;
 
         [[nodiscard]]

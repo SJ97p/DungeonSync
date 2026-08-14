@@ -97,6 +97,12 @@ namespace DungeonSync::Gameplay
         return currentRoomIndex_;
     }
 
+    std::size_t
+        DungeonController::RoomCount() const noexcept
+    {
+        return rooms_.size();
+    }
+
     bool DungeonController::IsDungeonCleared() const noexcept
     {
         return dungeonCleared_;

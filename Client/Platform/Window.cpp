@@ -141,6 +141,20 @@ namespace DungeonSync::Platform
         return clientHeight_;
     }
 
+    void Window::SetTitle(
+        const wchar_t* title) noexcept
+    {
+        if (handle_ == nullptr ||
+            title == nullptr)
+        {
+            return;
+        }
+
+        SetWindowTextW(
+            handle_,
+            title);
+    }
+
     LRESULT CALLBACK Window::WindowProcedure(
         HWND window,
         UINT message,
