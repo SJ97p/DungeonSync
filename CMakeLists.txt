@@ -21,6 +21,8 @@ add_executable(DungeonSyncClient WIN32
     Client/Rendering/Vertex.h
     Client/Presentation/DemoScene.cpp
     Client/Presentation/DemoScene.h
+    Client/Presentation/SpriteEffectPool.cpp
+    Client/Presentation/SpriteEffectPool.h
     Client/Rendering/Camera.h
     Client/Gameplay/Monster.h
     Client/Gameplay/CombatSystem.cpp
@@ -63,8 +65,18 @@ target_link_libraries(DungeonSyncServer PRIVATE
     ws2_32
 )
 
-set(TriangleShader
+set(RenderingShaders
     Client/Rendering/Shaders/Triangle.hlsl
+    Client/Rendering/Shaders/Ground.hlsl
+)
+
+set_source_files_properties(
+    ${RenderingShaders}
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
+
+target_sources(DungeonSyncClient PRIVATE
+    ${RenderingShaders}
 )
 
 set_source_files_properties(

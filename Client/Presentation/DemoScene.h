@@ -6,6 +6,7 @@
 #include "../Gameplay/CombatSystem.h"
 #include "../Gameplay/SpatialGrid.h"
 #include "../Gameplay/DungeonController.h"
+#include "SpriteEffectPool.h"
 
 #include <DirectXMath.h>
 #include <array>
@@ -67,11 +68,6 @@ namespace DungeonSync::Presentation
         float playerJumpHeight_{};
         float playerVerticalVelocity_{};
         bool playerIsGrounded_{ true };
-        float attackEffectRemainingSeconds_{};
-
-        DirectX::XMFLOAT2 attackEffectPosition_{};
-
-        float attackEffectFacingX_{ 1.0F };
 
         DirectX::XMFLOAT2 playerFacing_{
     0.0F,
@@ -85,13 +81,15 @@ namespace DungeonSync::Presentation
         Gameplay::CombatSystem combatSystem_{};
         Gameplay::SpatialGrid spatialGrid_;
         Gameplay::DungeonController dungeonController_;
+        SpriteEffectPool spriteEffectPool_{};
         
         Gameplay::AreaAttackResult
             lastAttackResult_{};
 
         std::array<
             Rendering::RenderItem,
-            1 + MonsterCount + 1>
+            1 + MonsterCount +
+            SpriteEffectPool::Capacity>
             renderItems_{};
 
         std::size_t visibleRenderItemCount_{};

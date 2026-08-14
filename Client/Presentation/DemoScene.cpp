@@ -115,11 +115,8 @@ namespace DungeonSync::Presentation
         const float simulationDeltaSeconds =
             (std::min)(deltaSeconds, 0.05F);
 
-        attackEffectRemainingSeconds_ =
-            (std::max)(
-                0.0F,
-                attackEffectRemainingSeconds_ -
-                simulationDeltaSeconds);
+        spriteEffectPool_.Update(
+            simulationDeltaSeconds);
 
         constexpr float PlayerMoveSpeed = 1.5F;
 
@@ -270,9 +267,53 @@ namespace DungeonSync::Presentation
         if (attackPressed &&
             playerIsGrounded_)
         {
-            attackEffectRemainingSeconds_ = 0.15F;
-            attackEffectPosition_ = playerPosition_;
-            attackEffectFacingX_ = playerVisualFacingX_;
+            SpriteEffectSpawn effectSpawn{};
+
+            effectSpawn.position = playerPosition_;
+            effectSpawn.worldHeight = 0.08F;
+            effectSpawn.facingX =
+                playerVisualFacingX_;
+
+            effectSpawn.scale = 0.85F;
+            effectSpawn.lifetimeSeconds = 0.15F;
+
+            effectSpawn.tintColor =
+                DirectX::XMFLOAT4{
+                    1.0F,
+                    0.85F,
+                    0.45F,
+                    0.85F
+            };
+
+            if (playerVisualFacingX_ > 0.0F)
+            {
+                effectSpawn.uvRectangle =
+                    DirectX::XMFLOAT4{
+                        0.75F,
+                        0.75F,
+                        -0.25F,
+                        0.25F
+                };
+            }
+            else
+            {
+                effectSpawn.uvRectangle =
+                    DirectX::XMFLOAT4{
+                        0.5F,
+                        0.75F,
+                        0.25F,
+                        0.25F
+                };
+            }
+
+            const bool effectSpawned =
+                spriteEffectPool_.Spawn(effectSpawn);
+
+            if (!effectSpawned)
+            {
+                OutputDebugStringA(
+                    "Sprite effect pool capacity reached.\n");
+            }
 
             constexpr float AttackRange = 0.45F;
             constexpr float AttackDamage = 50.0F;
@@ -505,24 +546,32 @@ namespace DungeonSync::Presentation
             ++visibleRenderItemCount_;
         }
 
-        if (attackEffectRemainingSeconds_ > 0.0F)
+        for (const SpriteEffect& effect :
+            spriteEffectPool_.Effects())
         {
+            if (!effect.active)
+            {
+                continue;
+            }
+
             Rendering::RenderItem& effectItem =
                 renderItems_[visibleRenderItemCount_];
 
             const float horizontalDirection =
-                attackEffectFacingX_;
+                effect.facingX < 0.0F
+                ? -1.0F
+                : 1.0F;
 
             const DirectX::XMMATRIX effectWorld =
                 DirectX::XMMatrixScaling(
-                    0.85F,
-                    0.85F,
+                    effect.scale,
+                    effect.scale,
                     1.0F) *
                 DirectX::XMMatrixTranslation(
-                    attackEffectPosition_.x +
+                    effect.position.x +
                     horizontalDirection * 0.28F,
-                    0.08F,
-                    attackEffectPosition_.y -
+                    effect.worldHeight,
+                    effect.position.y -
                     0.02F);
 
             DirectX::XMStoreFloat4x4(
@@ -530,33 +579,10 @@ namespace DungeonSync::Presentation
                 effectWorld);
 
             effectItem.tintColor =
-                DirectX::XMFLOAT4{
-                    1.0F,
-                    0.85F,
-                    0.45F,
-                    0.85F
-            };
+                effect.tintColor;
 
-            if (horizontalDirection > 0.0F)
-            {
-                effectItem.uvRectangle =
-                    DirectX::XMFLOAT4{
-                        0.75F,
-                        0.75F,
-                        -0.25F,
-                        0.25F
-                };
-            }
-            else
-            {
-                effectItem.uvRectangle =
-                    DirectX::XMFLOAT4{
-                        0.5F,
-                        0.75F,
-                        0.25F,
-                        0.25F
-                };
-            }
+            effectItem.uvRectangle =
+                effect.uvRectangle;
 
             ++visibleRenderItemCount_;
         }
@@ -573,11 +599,10 @@ namespace DungeonSync::Presentation
         };
 
         playerVisualFacingX_ = 1.0F;
-        attackEffectFacingX_ = 1.0F;
         playerJumpHeight_ = 0.0F;
         playerVerticalVelocity_ = 0.0F;
         playerIsGrounded_ = true;
-        attackEffectRemainingSeconds_ = 0.0F;
+        spriteEffectPool_.Clear();
 
         PrepareCurrentRoom();
 
