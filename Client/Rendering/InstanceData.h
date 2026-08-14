@@ -10,8 +10,10 @@ namespace DungeonSync::Rendering
         DirectX::XMFLOAT4 worldRow1;
         DirectX::XMFLOAT4 worldRow2;
         DirectX::XMFLOAT4 worldRow3;
+
         DirectX::XMFLOAT4 tintColor;
+        DirectX::XMFLOAT4 uvRectangle;
     };
 
-    static_assert(sizeof(InstanceData) == 80);
+    static_assert(sizeof(InstanceData) == 96);
 }

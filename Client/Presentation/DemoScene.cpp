@@ -103,6 +103,7 @@ namespace DungeonSync::Presentation
         float deltaSeconds,
         float moveX,
         float moveY,
+        bool jumpPressed,
         bool attackPressed,
         bool coneAttackPressed)
     {
@@ -110,6 +111,9 @@ namespace DungeonSync::Presentation
         {
             PrepareCurrentRoom();
         }
+
+        const float simulationDeltaSeconds =
+            (std::min)(deltaSeconds, 0.05F);
 
         constexpr float PlayerMoveSpeed = 1.5F;
 
@@ -124,10 +128,14 @@ namespace DungeonSync::Presentation
         }
 
         playerPosition_.x +=
-            moveX * PlayerMoveSpeed * deltaSeconds;
+            moveX *
+            PlayerMoveSpeed *
+            simulationDeltaSeconds;
 
         playerPosition_.y +=
-            moveY * PlayerMoveSpeed * deltaSeconds;
+            moveY *
+            PlayerMoveSpeed *
+            simulationDeltaSeconds;
 
         constexpr float MovementLimitX = 1.5F;
         constexpr float MovementLimitY = 1.5F;
@@ -141,6 +149,36 @@ namespace DungeonSync::Presentation
             playerPosition_.y,
             -MovementLimitY,
             MovementLimitY);
+
+        constexpr float JumpInitialVelocity = 2.8F;
+        constexpr float Gravity = -8.0F;
+
+        if (jumpPressed &&
+            playerIsGrounded_)
+        {
+            playerVerticalVelocity_ =
+                JumpInitialVelocity;
+
+            playerIsGrounded_ = false;
+        }
+
+        if (!playerIsGrounded_)
+        {
+            playerVerticalVelocity_ +=
+                Gravity *
+                simulationDeltaSeconds;
+
+            playerJumpHeight_ +=
+                playerVerticalVelocity_ *
+                simulationDeltaSeconds;
+
+            if (playerJumpHeight_ <= 0.0F)
+            {
+                playerJumpHeight_ = 0.0F;
+                playerVerticalVelocity_ = 0.0F;
+                playerIsGrounded_ = true;
+            }
+        }
 
         const Gameplay::RoomState stateBeforeUpdate =
             dungeonController_.CurrentRoom().state;
@@ -214,7 +252,8 @@ namespace DungeonSync::Presentation
         //}
 
         //Attack after Spacebar
-        if (attackPressed)
+        if (attackPressed &&
+            playerIsGrounded_)
         {
             constexpr float AttackRange = 0.45F;
             constexpr float AttackDamage = 50.0F;
@@ -253,7 +292,8 @@ namespace DungeonSync::Presentation
         }
 
         //Attack after E
-        if (coneAttackPressed)
+        if (coneAttackPressed &&
+            playerIsGrounded_)
         {
             constexpr float ConeAttackRange = 0.9F;
             constexpr float ConeAttackDamage = 50.0F;
@@ -346,12 +386,29 @@ namespace DungeonSync::Presentation
                 0.18F) *
             DirectX::XMMatrixTranslation(
                 playerPosition_.x,
-                playerPosition_.y,
+                playerPosition_.y +
+                playerJumpHeight_,
                 0.0F);
 
         DirectX::XMStoreFloat4x4(
             &renderItems_[0].world,
             playerWorld);
+
+        renderItems_[0].tintColor =
+            DirectX::XMFLOAT4{
+                1.0F,
+                1.0F,
+                1.0F,
+                1.0F
+        };
+
+        renderItems_[0].uvRectangle =
+            DirectX::XMFLOAT4{
+                0.0F,
+                0.0F,
+                0.5F,
+                0.5F
+        };
 
         ++visibleRenderItemCount_;
 
@@ -365,6 +422,14 @@ namespace DungeonSync::Presentation
 
             Rendering::RenderItem& renderItem =
                 renderItems_[visibleRenderItemCount_];
+
+            renderItem.uvRectangle =
+                DirectX::XMFLOAT4{
+                    0.5F,
+                    0.0F,
+                    0.5F,
+                    0.5F
+            };
 
             const DirectX::XMFLOAT2& monsterPosition =
                 monster.position;
@@ -388,8 +453,8 @@ namespace DungeonSync::Presentation
                 renderItem.tintColor =
                     DirectX::XMFLOAT4{
                         1.0F,
-                        0.8F,
-                        0.2F,
+                        0.55F,
+                        0.55F,
                         1.0F
                 };
             }
@@ -397,8 +462,8 @@ namespace DungeonSync::Presentation
             {
                 renderItem.tintColor =
                     DirectX::XMFLOAT4{
-                        0.25F,
-                        0.45F,
+                        1.0F,
+                        1.0F,
                         1.0F,
                         1.0F
                 };
@@ -417,6 +482,10 @@ namespace DungeonSync::Presentation
                 0.0F,
                 0.0F
         };
+
+        playerJumpHeight_ = 0.0F;
+        playerVerticalVelocity_ = 0.0F;
+        playerIsGrounded_ = true;
 
         PrepareCurrentRoom();
 

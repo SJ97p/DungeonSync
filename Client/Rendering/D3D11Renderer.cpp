@@ -1,8 +1,11 @@
 ﻿#include "D3D11Renderer.h"
-#include <d3dcompiler.h>
-#include <DirectXMath.h>
 #include "Vertex.h"
 #include "RenderItem.h"
+
+#include <d3dcompiler.h>
+#include <DirectXMath.h>
+#include <filesystem>
+#include <cstdio>
 #include <iterator>
 #include <cstddef>
 #include <cstring>
@@ -13,65 +16,29 @@ using Microsoft::WRL::ComPtr;
 
 namespace
 {
-    const DungeonSync::Rendering::Vertex CubeVertices[]{
-    {
-        { -0.5F, -0.5F, -0.5F },
-        { 1.0F, 0.0F, 0.0F, 1.0F }
-    },
-    {
-        { -0.5F,  0.5F, -0.5F },
-        { 0.0F, 1.0F, 0.0F, 1.0F }
-    },
-    {
-        {  0.5F,  0.5F, -0.5F },
-        { 0.0F, 0.0F, 1.0F, 1.0F }
-    },
-    {
-        {  0.5F, -0.5F, -0.5F },
-        { 1.0F, 1.0F, 0.0F, 1.0F }
-    },
-    {
-        { -0.5F, -0.5F,  0.5F },
-        { 1.0F, 0.0F, 1.0F, 1.0F }
-    },
-    {
-        { -0.5F,  0.5F,  0.5F },
-        { 0.0F, 1.0F, 1.0F, 1.0F }
-    },
-    {
-        {  0.5F,  0.5F,  0.5F },
-        { 1.0F, 1.0F, 1.0F, 1.0F }
-    },
-    {
-        {  0.5F, -0.5F,  0.5F },
-        { 0.4F, 0.4F, 0.4F, 1.0F }
-    }
+    const DungeonSync::Rendering::Vertex
+        SpriteVertices[]{
+        {
+            { -0.5F, -0.5F, 0.0F },
+            { 0.0F, 1.0F }
+        },
+        {
+            { -0.5F, 0.5F, 0.0F },
+            { 0.0F, 0.0F }
+        },
+        {
+            { 0.5F, 0.5F, 0.0F },
+            { 1.0F, 0.0F }
+        },
+        {
+            { 0.5F, -0.5F, 0.0F },
+            { 1.0F, 1.0F }
+        }
     };
 
-    constexpr std::uint16_t CubeIndices[]{
-        // 카메라에 가까운 면
+    constexpr std::uint16_t SpriteIndices[]{
         0, 1, 2,
-        0, 2, 3,
-
-        // 뒤쪽 면
-        4, 7, 6,
-        4, 6, 5,
-
-        // 왼쪽 면
-        4, 5, 1,
-        4, 1, 0,
-
-        // 오른쪽 면
-        3, 2, 6,
-        3, 6, 7,
-
-        // 위쪽 면
-        1, 5, 6,
-        1, 6, 2,
-
-        // 아래쪽 면
-        4, 0, 3,
-        4, 3, 7
+        0, 2, 3
     };
 
     struct alignas(16) SceneConstants
@@ -141,6 +108,30 @@ namespace DungeonSync::Rendering
             return false;
         }
 
+        if (!textureLoader_.Initialize())
+        {
+            OutputDebugStringA(
+                "Failed to initialize WIC texture loader.\n");
+
+            return false;
+        }
+
+        if (!CreateTextureResources())
+        {
+            OutputDebugStringA(
+                "Failed to create texture resources.\n");
+
+            return false;
+        }
+
+        if (!CreateSpriteSampler())
+        {
+            OutputDebugStringA(
+                "Failed to create sprite sampler.\n");
+
+            return false;
+        }
+
         if (!CreateRenderTarget())
         {
             return false;
@@ -151,7 +142,7 @@ namespace DungeonSync::Rendering
             return false;
         }
 
-        if (!CreateCubeGeometryBuffers())
+        if (!CreateSpriteGeometryBuffers())
         {
             return false;
         }
@@ -312,6 +303,74 @@ namespace DungeonSync::Rendering
         return SUCCEEDED(result);
     }
 
+    bool D3D11Renderer::CreateTextureResources()
+    {
+        const std::filesystem::path playerTexturePath{
+            L"Assets/Textures/Sprites/"
+            L"dungeon_sprite_atlas.png"
+        };
+
+        if (!textureLoader_.LoadFromFile(
+            *device_.Get(),
+            playerTexturePath,
+            spriteAtlas_))
+        {
+            OutputDebugStringW(
+                L"Failed to load player texture: ");
+
+            OutputDebugStringW(
+                playerTexturePath.c_str());
+
+            OutputDebugStringW(L"\n");
+
+            return false;
+        }
+
+        char message[128]{};
+
+        std::snprintf(
+            message,
+            sizeof(message),
+            "Loaded sprite atlas"
+            " | width: %u"
+            " | height: %u\n",
+            spriteAtlas_.width,
+            spriteAtlas_.height);
+
+        OutputDebugStringA(message);
+
+        return true;
+    }
+
+    bool D3D11Renderer::CreateSpriteSampler()
+    {
+        D3D11_SAMPLER_DESC description{};
+
+        description.Filter =
+            D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+
+        description.AddressU =
+            D3D11_TEXTURE_ADDRESS_CLAMP;
+
+        description.AddressV =
+            D3D11_TEXTURE_ADDRESS_CLAMP;
+
+        description.AddressW =
+            D3D11_TEXTURE_ADDRESS_CLAMP;
+
+        description.MinLOD = 0.0F;
+        description.MaxLOD =
+            D3D11_FLOAT32_MAX;
+
+        const HRESULT result =
+            device_->CreateSamplerState(
+                &description,
+                spriteSampler_
+                .ReleaseAndGetAddressOf());
+
+        return SUCCEEDED(result);
+    }
+
     void D3D11Renderer::Render(
         const Camera& camera,
         std::span<const RenderItem> renderItems)
@@ -451,6 +510,9 @@ namespace DungeonSync::Rendering
 
             instanceData[index].tintColor =
                 item.tintColor;
+
+            instanceData[index].uvRectangle =
+                item.uvRectangle;
         }
 
         deviceContext_->Unmap(
@@ -541,9 +603,30 @@ namespace DungeonSync::Rendering
             nullptr,
             0);
 
+        ID3D11ShaderResourceView*
+            shaderResources[]{
+                spriteAtlas_
+                    .shaderResourceView
+                    .Get()
+        };
+
+        deviceContext_->PSSetShaderResources(
+            0,
+            1,
+            shaderResources);
+
+        ID3D11SamplerState* samplers[]{
+            spriteSampler_.Get()
+        };
+
+        deviceContext_->PSSetSamplers(
+            0,
+            1,
+            samplers);
+
         deviceContext_->DrawIndexedInstanced(
             static_cast<UINT>(
-                std::size(CubeIndices)),
+                std::size(SpriteIndices)),
             static_cast<UINT>(
                 instanceCount),
             0,
@@ -561,11 +644,11 @@ namespace DungeonSync::Rendering
         return statistics_;
     }
 
-    bool D3D11Renderer::CreateCubeGeometryBuffers()
+    bool D3D11Renderer::CreateSpriteGeometryBuffers()
     {
         D3D11_BUFFER_DESC vertexBufferDescription{};
         vertexBufferDescription.ByteWidth =
-            static_cast<UINT>(sizeof(CubeVertices));
+            static_cast<UINT>(sizeof(SpriteVertices));
 
         vertexBufferDescription.Usage =
             D3D11_USAGE_IMMUTABLE;
@@ -574,7 +657,7 @@ namespace DungeonSync::Rendering
             D3D11_BIND_VERTEX_BUFFER;
 
         D3D11_SUBRESOURCE_DATA vertexInitialData{};
-        vertexInitialData.pSysMem = CubeVertices;
+        vertexInitialData.pSysMem = SpriteVertices;
 
         HRESULT result = device_->CreateBuffer(
             &vertexBufferDescription,
@@ -589,7 +672,7 @@ namespace DungeonSync::Rendering
         D3D11_BUFFER_DESC indexBufferDescription{};
 
         indexBufferDescription.ByteWidth =
-            static_cast<UINT>(sizeof(CubeIndices));
+            static_cast<UINT>(sizeof(SpriteIndices));
 
         indexBufferDescription.Usage =
             D3D11_USAGE_IMMUTABLE;
@@ -598,7 +681,7 @@ namespace DungeonSync::Rendering
             D3D11_BIND_INDEX_BUFFER;
 
         D3D11_SUBRESOURCE_DATA indexInitialData{};
-        indexInitialData.pSysMem = CubeIndices;
+        indexInitialData.pSysMem = SpriteIndices;
 
         result = device_->CreateBuffer(
             &indexBufferDescription,
@@ -671,65 +754,79 @@ namespace DungeonSync::Rendering
                 0
             },
             {
-                "COLOR",
+                "TEXCOORD",
                 0,
-                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                DXGI_FORMAT_R32G32_FLOAT,
                 0,
-                static_cast<UINT>(offsetof(Vertex, color)),
+                static_cast<UINT>(
+                    offsetof(
+                        Vertex,
+                        textureCoordinate)),
                 D3D11_INPUT_PER_VERTEX_DATA,
                 0
             },
-{
-    "INSTANCE_WORLD",
-    0,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
-    1,
-    static_cast<UINT>(
-        offsetof(InstanceData, worldRow0)),
-    D3D11_INPUT_PER_INSTANCE_DATA,
-    1
-},
-{
-    "INSTANCE_WORLD",
-    1,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
-    1,
-    static_cast<UINT>(
-        offsetof(InstanceData, worldRow1)),
-    D3D11_INPUT_PER_INSTANCE_DATA,
-    1
-},
-{
-    "INSTANCE_WORLD",
-    2,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
-    1,
-    static_cast<UINT>(
-        offsetof(InstanceData, worldRow2)),
-    D3D11_INPUT_PER_INSTANCE_DATA,
-    1
-},
-{
-    "INSTANCE_WORLD",
-    3,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
-    1,
-    static_cast<UINT>(
-        offsetof(InstanceData, worldRow3)),
-    D3D11_INPUT_PER_INSTANCE_DATA,
-    1
-},
-{
-    "INSTANCE_COLOR",
-    0,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
-    1,
-    static_cast<UINT>(
-        offsetof(InstanceData, tintColor)),
-    D3D11_INPUT_PER_INSTANCE_DATA,
-    1
-}
-
+            {
+                "INSTANCE_WORLD",
+                0,
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                1,
+                static_cast<UINT>(
+                    offsetof(InstanceData, worldRow0)),
+                D3D11_INPUT_PER_INSTANCE_DATA,
+                1
+            },
+            {
+                "INSTANCE_WORLD",
+                1,
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                1,
+                static_cast<UINT>(
+                    offsetof(InstanceData, worldRow1)),
+                D3D11_INPUT_PER_INSTANCE_DATA,
+                1
+            },
+            {
+                "INSTANCE_WORLD",
+                2,
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                1,
+                static_cast<UINT>(
+                    offsetof(InstanceData, worldRow2)),
+                D3D11_INPUT_PER_INSTANCE_DATA,
+                1
+            },
+            {
+                "INSTANCE_WORLD",
+                3,
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                1,
+                static_cast<UINT>(
+                    offsetof(InstanceData, worldRow3)),
+                D3D11_INPUT_PER_INSTANCE_DATA,
+                1
+            },
+            {
+                "INSTANCE_COLOR",
+                0,
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                1,
+                static_cast<UINT>(
+                    offsetof(InstanceData, tintColor)),
+                D3D11_INPUT_PER_INSTANCE_DATA,
+                1
+            },
+            {
+                "INSTANCE_UV",
+                0,
+                DXGI_FORMAT_R32G32B32A32_FLOAT,
+                1,
+                static_cast<UINT>(
+                    offsetof(
+                        InstanceData,
+                        uvRectangle)),
+                D3D11_INPUT_PER_INSTANCE_DATA,
+                1
+            }
         };
 
         result = device_->CreateInputLayout(

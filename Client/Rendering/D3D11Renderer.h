@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "InstanceData.h"
 #include "RenderStatistics.h"
+#include "WicTextureLoader.h"
 
 #include <Windows.h>
 #include <d3d11.h>
@@ -46,10 +47,12 @@ namespace DungeonSync::Rendering
 
         [[nodiscard]] bool CreateRenderTarget();
         [[nodiscard]] bool CreateDepthBuffer();
-        [[nodiscard]] bool CreateCubeGeometryBuffers();
+        [[nodiscard]] bool CreateSpriteGeometryBuffers();
         [[nodiscard]] bool CreateShadersAndInputLayout();
         [[nodiscard]] bool CreateConstantBuffer();
         [[nodiscard]] bool CreateInstanceBuffer();
+        [[nodiscard]] bool CreateTextureResources();
+        [[nodiscard]] bool CreateSpriteSampler();
 
         Microsoft::WRL::ComPtr<ID3D11Device> device_;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> deviceContext_;
@@ -61,9 +64,12 @@ namespace DungeonSync::Rendering
         Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer_;
         Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
         Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
+        Microsoft::WRL::ComPtr<ID3D11SamplerState> spriteSampler_;
         Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer_;
         Microsoft::WRL::ComPtr<ID3D11Buffer> instanceBuffer_;
+        WicTextureLoader textureLoader_{};
+        LoadedTexture spriteAtlas_{};
 
         D3D_FEATURE_LEVEL featureLevel_{};
 

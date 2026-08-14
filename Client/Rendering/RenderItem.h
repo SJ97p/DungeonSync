@@ -8,5 +8,6 @@ namespace DungeonSync::Rendering
     {
         DirectX::XMFLOAT4X4 world;
         DirectX::XMFLOAT4 tintColor;
+        DirectX::XMFLOAT4 uvRectangle;
     };
 }

@@ -122,7 +122,8 @@ namespace DungeonSync
         std::uint32_t lastLoggedServerSequence = 0;
         float serverLogElapsedSeconds = 0.0F;
 
-        bool spaceWasDown = false;
+        bool attackWasDown = false;
+        bool jumpWasDown = false;
         bool coneAttackWasDown = false;
         bool restartWasDown = false;
 
@@ -146,22 +147,22 @@ namespace DungeonSync
             float moveX = 0.0F;
             float moveY = 0.0F;
 
-            if ((GetAsyncKeyState('A') & 0x8000) != 0)
+            if ((GetAsyncKeyState(VK_LEFT) & 0x8000) != 0)
             {
                 moveX -= 1.0F;
             }
 
-            if ((GetAsyncKeyState('D') & 0x8000) != 0)
+            if ((GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0)
             {
                 moveX += 1.0F;
             }
 
-            if ((GetAsyncKeyState('S') & 0x8000) != 0)
+            if ((GetAsyncKeyState(VK_DOWN) & 0x8000) != 0)
             {
                 moveY -= 1.0F;
             }
 
-            if ((GetAsyncKeyState('W') & 0x8000) != 0)
+            if ((GetAsyncKeyState(VK_UP) & 0x8000) != 0)
             {
                 moveY += 1.0F;
             }
@@ -178,13 +179,21 @@ namespace DungeonSync
                 moveY *= DiagonalNormalizer;
             }
 
-            const bool spaceIsDown =
-                (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+            const bool attackIsDown =
+                (GetAsyncKeyState('X') & 0x8000) != 0;
 
             const bool attackPressed =
-                spaceIsDown && !spaceWasDown;
+                attackIsDown && !attackWasDown;
 
-            spaceWasDown = spaceIsDown;
+            attackWasDown = attackIsDown;
+
+            const bool jumpIsDown =
+                (GetAsyncKeyState('C') & 0x8000) != 0;
+
+            const bool jumpPressed =
+                jumpIsDown && !jumpWasDown;
+
+            jumpWasDown = jumpIsDown;
 
             const bool coneAttackIsDown =
                 (GetAsyncKeyState('E') & 0x8000) != 0;
@@ -225,6 +234,7 @@ namespace DungeonSync
                 frameElapsed.count(),
                 moveX,
                 moveY,
+                jumpPressed,
                 attackPressed,
                 coneAttackPressed);
 

@@ -3,10 +3,13 @@ cbuffer SceneConstants : register(b0)
     row_major float4x4 viewProjection;
 };
 
+Texture2D spriteTexture : register(t0);
+SamplerState spriteSampler : register(s0);
+
 struct VertexInput
 {
     float3 position : POSITION;
-    float4 color : COLOR;
+    float2 textureCoordinate : TEXCOORD;
 
     float4 worldRow0 : INSTANCE_WORLD0;
     float4 worldRow1 : INSTANCE_WORLD1;
@@ -14,12 +17,14 @@ struct VertexInput
     float4 worldRow3 : INSTANCE_WORLD3;
 
     float4 tintColor : INSTANCE_COLOR;
+    float4 uvRectangle : INSTANCE_UV;
 };
 
 struct VertexOutput
 {
     float4 position : SV_POSITION;
-    float4 color : COLOR;
+    float2 textureCoordinate : TEXCOORD;
+    float4 tintColor : COLOR;
 };
 
 VertexOutput VSMain(VertexInput input)
@@ -32,20 +37,36 @@ VertexOutput VSMain(VertexInput input)
         input.worldRow2,
         input.worldRow3);
 
-    float4 worldPosition = mul(
-        float4(input.position, 1.0F),
-        world);
+    const float4 worldPosition =
+        mul(
+            float4(input.position, 1.0F),
+            world);
 
-    output.position = mul(
-        worldPosition,
-        viewProjection);
+    output.position =
+        mul(
+            worldPosition,
+            viewProjection);
 
-    output.color = input.tintColor;
+    output.textureCoordinate =
+        input.uvRectangle.xy +
+        input.textureCoordinate *
+        input.uvRectangle.zw;
+
+    output.tintColor =
+        input.tintColor;
 
     return output;
 }
 
 float4 PSMain(VertexOutput input) : SV_TARGET
 {
-    return input.color;
+    const float4 textureColor =
+        spriteTexture.Sample(
+            spriteSampler,
+            input.textureCoordinate);
+
+    clip(textureColor.a - 0.05F);
+
+    return textureColor *
+        input.tintColor;
 }

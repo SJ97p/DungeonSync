@@ -16,6 +16,8 @@ add_executable(DungeonSyncClient WIN32
     Client/Platform/Window.h
     Client/Rendering/D3D11Renderer.cpp
     Client/Rendering/D3D11Renderer.h
+    Client/Rendering/WicTextureLoader.cpp
+    Client/Rendering/WicTextureLoader.h
     Client/Rendering/Vertex.h
     Client/Presentation/DemoScene.cpp
     Client/Presentation/DemoScene.h
@@ -52,6 +54,8 @@ target_link_libraries(DungeonSyncClient PRIVATE
     d3d11
     dxgi
     d3dcompiler
+    windowscodecs
+    ole32
     ws2_32
 )
 

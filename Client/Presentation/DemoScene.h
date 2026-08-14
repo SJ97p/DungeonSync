@@ -23,6 +23,7 @@ namespace DungeonSync::Presentation
             float deltaSeconds,
             float moveX,
             float moveY,
+            bool jumpPressed,
             bool attackPressed,
             bool coneAttackPressed);
 
@@ -63,6 +64,9 @@ namespace DungeonSync::Presentation
         static constexpr std::size_t MonsterCount = 100;
 
         DirectX::XMFLOAT2 playerPosition_{};
+        float playerJumpHeight_{};
+        float playerVerticalVelocity_{};
+        bool playerIsGrounded_{ true };
 
         DirectX::XMFLOAT2 playerFacing_{
     0.0F,
