@@ -41,9 +41,14 @@ namespace DungeonSync::Diagnostics
     {
     public:
         static constexpr float WarmupSeconds = 2.0F;
+
+        static constexpr float MinimumMeasurementSeconds =
+            3.0F;
+
         static constexpr std::size_t
             TargetSampleCount =
             FrameTimeProfiler::SampleCapacity;
+
 
         static constexpr std::size_t ScenarioCount = 8;
 

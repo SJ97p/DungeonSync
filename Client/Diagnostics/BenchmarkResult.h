@@ -12,6 +12,7 @@ namespace DungeonSync::Diagnostics
         std::string scenarioName;
         std::string submissionMode;
         std::string buildConfiguration;
+        std::string presentationMode;
 
         std::size_t instanceCount{};
         std::size_t drawCallCount{};

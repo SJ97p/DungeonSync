@@ -35,7 +35,9 @@ namespace DungeonSync::Diagnostics
             phaseElapsedSeconds_ +=
                 safeDeltaSeconds;
 
-            if (collectedSampleCount <
+            if (phaseElapsedSeconds_ <
+                WarmupSeconds ||
+                collectedSampleCount <
                 TargetSampleCount)
             {
                 return BenchmarkSessionEvent::None;
@@ -52,7 +54,9 @@ namespace DungeonSync::Diagnostics
             phaseElapsedSeconds_ +=
                 safeDeltaSeconds;
 
-            if (collectedSampleCount <
+            if (phaseElapsedSeconds_ <
+                MinimumMeasurementSeconds ||
+                collectedSampleCount <
                 TargetSampleCount)
             {
                 return BenchmarkSessionEvent::None;

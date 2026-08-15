@@ -76,6 +76,7 @@ namespace DungeonSync::Diagnostics
                 << "scenario,"
                 << "submission_mode,"
                 << "build,"
+                << "presentation_mode,"
                 << "instances,"
                 << "draw_calls,"
                 << "dropped_instances,"
@@ -126,6 +127,7 @@ namespace DungeonSync::Diagnostics
             << result.scenarioName << ','
             << result.submissionMode << ','
             << result.buildConfiguration << ','
+            << result.presentationMode << ','
             << result.instanceCount << ','
             << result.drawCallCount << ','
             << result.droppedInstanceCount << ','

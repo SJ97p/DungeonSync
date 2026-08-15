@@ -42,6 +42,11 @@ namespace DungeonSync::Rendering
         const RenderStatistics&
             Statistics() const noexcept;
 
+        void SetVSyncEnabled(bool enabled) noexcept;
+
+        [[nodiscard]]
+        bool IsVSyncEnabled() const noexcept;
+
         void BeginGpuTimingGeneration() noexcept;
 
         void Render(
@@ -150,5 +155,6 @@ namespace DungeonSync::Rendering
         RenderStatistics statistics_{};
         std::uint32_t width_{};
         std::uint32_t height_{};
+        UINT presentSyncInterval_{ 1 };
     };
 }

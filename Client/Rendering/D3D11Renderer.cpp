@@ -722,7 +722,9 @@ namespace DungeonSync::Rendering
             const auto presentStart =
                 std::chrono::steady_clock::now();
 
-            swapChain_->Present(1, 0);
+            swapChain_->Present(
+                presentSyncInterval_,
+                0);
 
             const auto presentEnd =
                 std::chrono::steady_clock::now();
@@ -1143,7 +1145,9 @@ namespace DungeonSync::Rendering
         const auto presentStart =
             std::chrono::steady_clock::now();
 
-        swapChain_->Present(1, 0);
+        swapChain_->Present(
+            presentSyncInterval_,
+            0);
 
         const auto presentEnd =
             std::chrono::steady_clock::now();
@@ -1161,6 +1165,19 @@ namespace DungeonSync::Rendering
         D3D11Renderer::Statistics() const noexcept
     {
         return statistics_;
+    }
+
+    void D3D11Renderer::SetVSyncEnabled(
+        bool enabled) noexcept
+    {
+        presentSyncInterval_ =
+            enabled ? 1U : 0U;
+    }
+
+    bool D3D11Renderer::IsVSyncEnabled()
+        const noexcept
+    {
+        return presentSyncInterval_ != 0;
     }
 
     void D3D11Renderer::

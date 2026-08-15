@@ -473,12 +473,14 @@ namespace DungeonSync
             if (benchmarkStartPressed &&
                 !benchmarkSession_.IsActive())
             {
+                renderer_.SetVSyncEnabled(false);
                 benchmarkSession_.Start();
                 applyBenchmarkScenario();
 
                 OutputDebugStringA(
-                    "Automated benchmark started."
-                    " Press F9 to cancel.\n");
+                    "Automated benchmark started"
+                    " | presentation: immediate"
+                    " | press F9 to cancel.\n");
             }
 
             if (benchmarkCancelPressed &&
@@ -486,6 +488,7 @@ namespace DungeonSync
             {
                 benchmarkSession_.Stop();
                 renderingStressScene_.Disable();
+                renderer_.SetVSyncEnabled(true);
 
                 stressSubmissionMode =
                     Rendering::SpriteSubmissionMode::
@@ -494,7 +497,8 @@ namespace DungeonSync
                 resetBenchmarkProfilers();
 
                 OutputDebugStringA(
-                    "Automated benchmark cancelled.\n");
+                    "Automated benchmark cancelled"
+                    " | VSync restored.\n");
             }
 
             std::size_t collectedBenchmarkSamples =
@@ -533,7 +537,10 @@ namespace DungeonSync
                     measurementMessage,
                     sizeof(measurementMessage),
                     "Benchmark measurement started"
+                    " | minimum duration: %.1f seconds"
                     " | target samples: %zu\n",
+                    Diagnostics::BenchmarkSession::
+                    MinimumMeasurementSeconds,
                     Diagnostics::BenchmarkSession::
                     TargetSampleCount);
 
@@ -562,6 +569,11 @@ namespace DungeonSync
                     InstancedBatch
                     ? "instanced"
                     : "per_instance";
+
+                result.presentationMode =
+                    renderer_.IsVSyncEnabled()
+                    ? "vsync"
+                    : "immediate";
 
 #ifdef NDEBUG
                 result.buildConfiguration = "Release";
@@ -634,6 +646,7 @@ namespace DungeonSync
                 else
                 {
                     renderingStressScene_.Disable();
+                    renderer_.SetVSyncEnabled(true);
 
                     stressSubmissionMode =
                         Rendering::SpriteSubmissionMode::
@@ -641,6 +654,7 @@ namespace DungeonSync
 
                     OutputDebugStringA(
                         "Automated benchmark completed."
+                        " VSync restored."
                         " Results: Benchmarks/results.csv\n");
                 }
             }
