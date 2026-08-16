@@ -47,6 +47,11 @@ namespace DungeonSync::Rendering
         [[nodiscard]]
         bool IsVSyncEnabled() const noexcept;
 
+        [[nodiscard]]
+        bool UploadDecodedTexture(
+            const DecodedImage& image,
+            LoadedTexture& outputTexture);
+
         void BeginGpuTimingGeneration() noexcept;
 
         void Render(

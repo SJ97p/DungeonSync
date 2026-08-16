@@ -10,6 +10,7 @@
 #include <iterator>
 #include <thread>
 #include <array>
+#include <filesystem>
 
 namespace
 {
@@ -110,6 +111,45 @@ namespace DungeonSync
 
             return EXIT_FAILURE;
         }
+
+        if (!asyncTextureLoader_.Start())
+        {
+            OutputDebugStringA(
+                "Failed to start async texture loader.\n");
+
+            return EXIT_FAILURE;
+        }
+
+        const std::filesystem::path
+            asyncTextureTestPath{
+                L"Assets/Textures/Environment/"
+                L"floor_stone_b.png"
+        };
+
+        const std::optional<std::uint64_t>
+            asyncTextureRequestId =
+            asyncTextureLoader_.Request(
+                asyncTextureTestPath);
+
+        if (!asyncTextureRequestId.has_value())
+        {
+            OutputDebugStringA(
+                "Failed to queue async texture request.\n");
+
+            return EXIT_FAILURE;
+        }
+
+        char asyncRequestMessage[192]{};
+
+        std::snprintf(
+            asyncRequestMessage,
+            sizeof(asyncRequestMessage),
+            "Async texture request queued"
+            " | request: %llu\n",
+            static_cast<unsigned long long>(
+                asyncTextureRequestId.value()));
+
+        OutputDebugStringA(asyncRequestMessage);
 
         auto previousTime =
             std::chrono::steady_clock::now();
@@ -226,6 +266,79 @@ namespace DungeonSync
             previousTime = currentTime;
             frameTimeProfiler_.RecordFrame(
                 frameElapsed.count());
+
+            Rendering::AsyncTextureLoadResult
+                completedTextureLoad{};
+
+            if (asyncTextureLoader_.TryPopCompleted(
+                completedTextureLoad))
+            {
+                Rendering::LoadedTexture uploadedTexture{};
+
+                const auto uploadStart =
+                    std::chrono::steady_clock::now();
+
+                const bool uploadSucceeded =
+                    completedTextureLoad.succeeded &&
+                    renderer_.UploadDecodedTexture(
+                        completedTextureLoad.image,
+                        uploadedTexture);
+
+                const auto uploadEnd =
+                    std::chrono::steady_clock::now();
+
+                const float uploadMilliseconds =
+                    std::chrono::duration<
+                    float,
+                    std::milli>(
+                        uploadEnd - uploadStart)
+                    .count();
+
+                const std::uint64_t estimatedGpuBytes =
+                    static_cast<std::uint64_t>(
+                        completedTextureLoad.image.width) *
+                    completedTextureLoad.image.height *
+                    4ULL;
+
+                const Rendering::AsyncTextureLoaderStatistics
+                    loaderStatistics =
+                    asyncTextureLoader_.Statistics();
+
+                char completedMessage[384]{};
+
+                std::snprintf(
+                    completedMessage,
+                    sizeof(completedMessage),
+                    "Async texture load completed"
+                    " | request: %llu"
+                    " | decode success: %s"
+                    " | upload success: %s"
+                    " | width: %u"
+                    " | height: %u"
+                    " | bytes: %zu"
+                    " | decode: %.3f ms"
+                    " | upload: %.3f ms"
+                    " | estimated GPU bytes: %llu"
+                    " | peak decoded bytes: %zu\n",
+                    static_cast<unsigned long long>(
+                        completedTextureLoad.requestId),
+                    completedTextureLoad.succeeded
+                    ? "true"
+                    : "false",
+                    uploadSucceeded
+                    ? "true"
+                    : "false",
+                    completedTextureLoad.image.width,
+                    completedTextureLoad.image.height,
+                    completedTextureLoad.image.pixels.size(),
+                    completedTextureLoad.decodeMilliseconds,
+                    uploadMilliseconds,
+                    static_cast<unsigned long long>(
+                        estimatedGpuBytes),
+                    loaderStatistics.peakDecodedBytes);
+
+                OutputDebugStringA(completedMessage);
+            }
 
             serverLogElapsedSeconds +=
                 frameElapsed.count();
@@ -976,6 +1089,7 @@ namespace DungeonSync
 
         }
 
+        asyncTextureLoader_.Stop();
         serverStateReceiver_.Stop();
 
         return EXIT_SUCCESS;

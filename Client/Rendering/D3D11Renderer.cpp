@@ -1180,6 +1180,23 @@ namespace DungeonSync::Rendering
         return presentSyncInterval_ != 0;
     }
 
+    bool D3D11Renderer::UploadDecodedTexture(
+        const DecodedImage& image,
+        LoadedTexture& outputTexture)
+    {
+        if (device_ == nullptr)
+        {
+            outputTexture = {};
+            return false;
+        }
+
+        return WicTextureLoader::
+            CreateTextureFromDecodedImage(
+                *device_.Get(),
+                image,
+                outputTexture);
+    }
+
     void D3D11Renderer::
         BeginGpuTimingGeneration() noexcept
     {

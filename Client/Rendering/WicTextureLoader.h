@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <vector>
 
 namespace DungeonSync::Rendering
 {
@@ -17,6 +18,15 @@ namespace DungeonSync::Rendering
 
         std::uint32_t width{};
         std::uint32_t height{};
+    };
+
+    struct DecodedImage
+    {
+        std::vector<std::uint8_t> pixels;
+
+        std::uint32_t width{};
+        std::uint32_t height{};
+        std::uint32_t rowPitch{};
     };
 
     class WicTextureLoader final
@@ -39,6 +49,17 @@ namespace DungeonSync::Rendering
 
         [[nodiscard]]
         bool Initialize();
+
+        [[nodiscard]]
+        bool DecodeFromFile(
+            const std::filesystem::path& path,
+            DecodedImage& outputImage) const;
+
+        [[nodiscard]]
+        static bool CreateTextureFromDecodedImage(
+            ID3D11Device& device,
+            const DecodedImage& image,
+            LoadedTexture& outputTexture);
 
         [[nodiscard]]
         bool LoadFromFile(

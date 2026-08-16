@@ -18,12 +18,14 @@ add_executable(DungeonSyncClient WIN32
     Client/Rendering/D3D11Renderer.h
     Client/Rendering/WicTextureLoader.cpp
     Client/Rendering/WicTextureLoader.h
+    Client/Rendering/AsyncTextureLoader.cpp
+    Client/Rendering/AsyncTextureLoader.h
     Client/Rendering/Vertex.h
+    Client/Rendering/Camera.h
     Client/Presentation/DemoScene.cpp
     Client/Presentation/DemoScene.h
     Client/Presentation/SpriteEffectPool.cpp
     Client/Presentation/SpriteEffectPool.h
-    Client/Rendering/Camera.h
     Client/Gameplay/Monster.h
     Client/Gameplay/CombatSystem.cpp
     Client/Gameplay/CombatSystem.h

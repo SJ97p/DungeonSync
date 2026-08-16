@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <vector>
+#include <utility>
 
 using Microsoft::WRL::ComPtr;
 
@@ -25,12 +26,11 @@ namespace DungeonSync::Rendering
         return SUCCEEDED(result);
     }
 
-    bool WicTextureLoader::LoadFromFile(
-        ID3D11Device& device,
+    bool WicTextureLoader::DecodeFromFile(
         const std::filesystem::path& path,
-        LoadedTexture& outputTexture) const
+        DecodedImage& outputImage) const
     {
-        outputTexture = {};
+        outputImage = {};
 
         if (factory_ == nullptr ||
             path.empty())
@@ -137,11 +137,44 @@ namespace DungeonSync::Rendering
             return false;
         }
 
-        D3D11_TEXTURE2D_DESC
-            textureDescription{};
+        outputImage.width = width;
+        outputImage.height = height;
+        outputImage.rowPitch = rowPitch;
+        outputImage.pixels = std::move(pixels);
 
-        textureDescription.Width = width;
-        textureDescription.Height = height;
+        return true;
+    }
+
+    bool WicTextureLoader::CreateTextureFromDecodedImage(
+        ID3D11Device& device,
+        const DecodedImage& image,
+        LoadedTexture& outputTexture)
+    {
+        outputTexture = {};
+
+        if (image.width == 0 ||
+            image.height == 0 ||
+            image.rowPitch == 0 ||
+            image.pixels.empty())
+        {
+            return false;
+        }
+
+        const std::uint64_t requiredByteCount =
+            static_cast<std::uint64_t>(
+                image.rowPitch) *
+            image.height;
+
+        if (requiredByteCount >
+            image.pixels.size())
+        {
+            return false;
+        }
+
+        D3D11_TEXTURE2D_DESC textureDescription{};
+
+        textureDescription.Width = image.width;
+        textureDescription.Height = image.height;
         textureDescription.MipLevels = 1;
         textureDescription.ArraySize = 1;
         textureDescription.Format =
@@ -155,12 +188,16 @@ namespace DungeonSync::Rendering
             D3D11_BIND_SHADER_RESOURCE;
 
         D3D11_SUBRESOURCE_DATA initialData{};
-        initialData.pSysMem = pixels.data();
-        initialData.SysMemPitch = rowPitch;
+
+        initialData.pSysMem =
+            image.pixels.data();
+
+        initialData.SysMemPitch =
+            image.rowPitch;
 
         ComPtr<ID3D11Texture2D> texture;
 
-        result = device.CreateTexture2D(
+        HRESULT result = device.CreateTexture2D(
             &textureDescription,
             &initialData,
             texture.ReleaseAndGetAddressOf());
@@ -179,27 +216,44 @@ namespace DungeonSync::Rendering
         viewDescription.ViewDimension =
             D3D11_SRV_DIMENSION_TEXTURE2D;
 
-        viewDescription.Texture2D.MostDetailedMip =
-            0;
-
+        viewDescription.Texture2D.MostDetailedMip = 0;
         viewDescription.Texture2D.MipLevels = 1;
 
-        result =
-            device.CreateShaderResourceView(
-                texture.Get(),
-                &viewDescription,
-                outputTexture
-                .shaderResourceView
-                .ReleaseAndGetAddressOf());
+        result = device.CreateShaderResourceView(
+            texture.Get(),
+            &viewDescription,
+            outputTexture
+            .shaderResourceView
+            .ReleaseAndGetAddressOf());
 
         if (FAILED(result))
         {
             return false;
         }
 
-        outputTexture.width = width;
-        outputTexture.height = height;
+        outputTexture.width = image.width;
+        outputTexture.height = image.height;
 
         return true;
+    }
+
+    bool WicTextureLoader::LoadFromFile(
+        ID3D11Device& device,
+        const std::filesystem::path& path,
+        LoadedTexture& outputTexture) const
+    {
+        DecodedImage decodedImage{};
+
+        if (!DecodeFromFile(
+            path,
+            decodedImage))
+        {
+            return false;
+        }
+
+        return CreateTextureFromDecodedImage(
+            device,
+            decodedImage,
+            outputTexture);
     }
 }

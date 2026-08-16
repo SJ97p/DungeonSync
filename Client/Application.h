@@ -2,6 +2,7 @@
 
 #include "Platform/Window.h"
 #include "Rendering/D3D11Renderer.h"
+#include "Rendering/AsyncTextureLoader.h"
 #include "Presentation/DemoScene.h"
 #include "Network/TcpClient.h"
 #include "Network/ServerStateReceiver.h"
@@ -38,6 +39,8 @@ namespace DungeonSync
 
         Platform::Window window_;
         Rendering::D3D11Renderer renderer_;
+        Rendering::AsyncTextureLoader
+            asyncTextureLoader_;
         Diagnostics::FrameTimeProfiler frameTimeProfiler_;
         Diagnostics::FrameTimeProfiler
             cpuSubmissionProfiler_;
