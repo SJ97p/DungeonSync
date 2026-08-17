@@ -30,7 +30,7 @@ const nodes = {
       STREAM --> MEM[메모리 지표]
       PROF --> HUD[진단 오버레이]
       MEM --> HUD`,
-    links: { APP: "application", SCENE: "combat", STREAM: "streaming", NET: "network", RENDER: "renderer", PROF: "diagnostics", HUD: "diagnostics", MEM: "memory" },
+    links: { APP: "application", SCENE: "demoscene", STREAM: "streaming", NET: "network", RENDER: "renderer", GPU: "renderer", PROF: "diagnostics", HUD: "diagnosticsoverlay", MEM: "memory" },
     scripts: ["application", "renderer", "streaming", "diagnostics", "network"],
     evidence: ["baseline", "instanced", "streamed", "benchmark"],
     report: "overview"
@@ -51,7 +51,7 @@ const nodes = {
       SPRITE --> QUERY[GPU 측정 종료]
       QUERY --> OVERLAY[D2D 진단 오버레이]
       OVERLAY --> PRESENT[SwapChain Present]`,
-    links: { SPRITE: "instancing", QUERY: "diagnostics", OVERLAY: "diagnostics" },
+    links: { FRAME: "frametimeprofiler", BG: "d3d11renderer", GROUND: "d3d11renderer", SPRITE: "instancing", QUERY: "diagnostics", OVERLAY: "diagnosticsoverlay", PRESENT: "d3d11renderer" },
     scripts: ["d3d11renderer", "diagnosticsoverlay", "demoscene"],
     evidence: ["baseline", "instanced"]
   },
@@ -71,7 +71,7 @@ const nodes = {
       MANY --> METRIC[CPU / GPU / Present 지표]
       ONE --> METRIC
       METRIC --> CSV[CSV 측정 결과]`,
-    links: { ITEMS: "renderingstressscene", ONE: "d3d11renderer", CSV: "benchmarksession" },
+    links: { ITEMS: "renderingstressscene", MANY: "d3d11renderer", ONE: "d3d11renderer", METRIC: "frametimeprofiler", CSV: "benchmarksession" },
     scripts: ["renderingstressscene", "d3d11renderer", "benchmarksession", "frametimeprofiler"],
     evidence: ["benchmark", "instanced"],
     report: "rendering"
@@ -92,7 +92,7 @@ const nodes = {
       CQ --> UPLOAD[프레임당 1회 업로드]
       UPLOAD --> CACHE[텍스처 캐시]
       CACHE --> DRAW[지면 텍스처 교체]`,
-    links: { WORKER: "asynctextureloader", UPLOAD: "textureresourcemanager", CACHE: "textureresourcemanager", DRAW: "d3d11renderer" },
+    links: { REQUEST: "textureresourcemanager", RQ: "asynctextureloader", WORKER: "asynctextureloader", CQ: "textureresourcemanager", UPLOAD: "textureresourcemanager", CACHE: "textureresourcemanager", DRAW: "d3d11renderer" },
     scripts: ["asynctextureloader", "textureresourcemanager", "wictextureloader", "d3d11renderer"],
     evidence: ["streamed", "retained"],
     report: "streaming"
@@ -113,7 +113,7 @@ const nodes = {
       PRESENT[Present 대기] --> FP
       MEMORY[메모리 측정] --> HUD[DiagnosticsOverlay]
       FP --> HUD`,
-    links: { FP: "frametimeprofiler", GPUQ: "d3d11renderer", MEMORY: "processmemorysampler", HUD: "diagnosticsoverlay" },
+    links: { FRAME: "frametimeprofiler", SUBMIT: "frametimeprofiler", FP: "frametimeprofiler", GPUQ: "d3d11renderer", PRESENT: "d3d11renderer", MEMORY: "processmemorysampler", HUD: "diagnosticsoverlay" },
     scripts: ["frametimeprofiler", "diagnosticsoverlay", "processmemorysampler", "d3d11renderer"],
     evidence: ["baseline", "instanced", "streamed"]
   },
@@ -133,7 +133,7 @@ const nodes = {
       DECODE[디코드 픽셀] --> CPU[대기 / 최대 디코드]
       TEX --> TRACKED[추적 GPU 합계]
       IB --> TRACKED`,
-    links: { OS: "processmemorysampler", CACHE: "textureresourcemanager", BUFFER: "d3d11renderer" },
+    links: { OS: "processmemorysampler", WS: "processmemorysampler", CACHE: "textureresourcemanager", TEX: "textureresourcemanager", BUFFER: "d3d11renderer", IB: "d3d11renderer", DECODE: "asynctextureloader", CPU: "asynctextureloader", TRACKED: "processmemorysampler" },
     scripts: ["processmemorysampler", "textureresourcemanager", "d3d11renderer"],
     evidence: ["baseline", "instanced", "streamed", "retained"]
   },
@@ -153,7 +153,7 @@ const nodes = {
       CELLS --> BROAD[Broad Phase 후보]
       BROAD --> NARROW[거리² / 부채꼴 검사]
       NARROW --> HIT[최종 피격 대상]`,
-    links: { GRID: "spatialgrid", BROAD: "combatsystem", NARROW: "combatsystem" },
+    links: { WORLD: "demoscene", GRID: "spatialgrid", ATTACK: "demoscene", CELLS: "spatialgrid", BROAD: "combatsystem", NARROW: "combatsystem", HIT: "demoscene" },
     scripts: ["spatialgrid", "combatsystem", "demoscene"],
     evidence: []
   },
@@ -188,7 +188,7 @@ const nodes = {
       Application *-- D3D11Renderer
       Application *-- TextureResourceManager
       Application *-- ServerStateReceiver
-      Application *-- DemoScene`, scripts: [], source: code("Client/Application.cpp", "int Application::Run", ["Application::Run"]) },
+      Application *-- DemoScene`, links: { D3D11Renderer: "d3d11renderer", TextureResourceManager: "textureresourcemanager", ServerStateReceiver: "serverstatereceiver", DemoScene: "demoscene" }, scripts: [], source: code("Client/Application.cpp", "int Application::Run", ["Application::Run"]) },
   d3d11renderer: { type: "class", title: "D3D11Renderer", summary: "DX11 자원과 렌더 패스를 소유합니다.", intent: "장면 제출과 GPU 자원 수명을 한 컴포넌트가 관리합니다.", issue: "패스가 늘면 단일 클래스가 커질 수 있습니다.", final: "배경·지면·스프라이트, GPU query, Present 구간을 명확한 순서로 실행합니다.", next: "RenderGraph 또는 pass 객체 분리를 고려할 수 있습니다.", graph: `classDiagram
       class D3D11Renderer {
         +Initialize() bool
@@ -196,7 +196,7 @@ const nodes = {
         +UploadDecodedTexture() bool
       }
       D3D11Renderer *-- DiagnosticsOverlay
-      D3D11Renderer *-- WicTextureLoader`, scripts: [], source: code("Client/Rendering/D3D11Renderer.cpp", "void D3D11Renderer::Render", ["D3D11Renderer::Render", "D3D11Renderer::UploadDecodedTexture"]) },
+      D3D11Renderer *-- WicTextureLoader`, links: { DiagnosticsOverlay: "diagnosticsoverlay", WicTextureLoader: "wictextureloader" }, scripts: [], source: code("Client/Rendering/D3D11Renderer.cpp", "void D3D11Renderer::Render", ["D3D11Renderer::Render", "D3D11Renderer::UploadDecodedTexture"]) },
   asynctextureloader: { type: "class", title: "AsyncTextureLoader", summary: "bounded producer-consumer queue와 worker lifetime을 관리합니다.", intent: "CPU 디코드를 메인 루프에서 분리합니다.", issue: "완료 큐가 가득 찰 때 worker가 안전하게 대기해야 합니다.", final: "condition_variable predicate에 stop과 queue 상태를 포함하고 Stop에서 notify_all 후 join합니다.", next: "우선순위·취소·다중 worker 정책이 확장점입니다.", graph: `classDiagram
       class AsyncTextureLoader {
         +Start() bool
@@ -204,7 +204,7 @@ const nodes = {
         +TryPopCompleted() bool
         +Stop() void
       }
-      AsyncTextureLoader *-- WicTextureLoader`, scripts: [], source: code("Client/Rendering/AsyncTextureLoader.cpp", "bool AsyncTextureLoader::Start", ["AsyncTextureLoader::Start", "AsyncTextureLoader::Request", "AsyncTextureLoader::WorkerMain", "AsyncTextureLoader::Stop"]) },
+      AsyncTextureLoader *-- WicTextureLoader`, links: { WicTextureLoader: "wictextureloader" }, scripts: [], source: code("Client/Rendering/AsyncTextureLoader.cpp", "bool AsyncTextureLoader::Start", ["AsyncTextureLoader::Start", "AsyncTextureLoader::Request", "AsyncTextureLoader::WorkerMain", "AsyncTextureLoader::Stop"]) },
   textureresourcemanager: { type: "class", title: "TextureResourceManager", summary: "요청 상태, 캐시, 메인 스레드 업로드와 메모리 통계를 관리합니다.", intent: "비동기 작업과 렌더러 사이의 정책 계층입니다.", issue: "GPU API 호출 위치와 resource state 전이가 명확해야 합니다.", final: "Unloaded→Queued→ReadyForUpload→Ready/Failed 상태와 path cache를 유지합니다.", next: "Eviction policy와 resource group dependency가 필요합니다.", graph: `flowchart TB
       REQUEST[RequestAsync] --> MANAGER[TextureResourceManager]
       MANAGER --> QUEUED[Queued]
@@ -220,12 +220,14 @@ const nodes = {
         +DecodeFromFile() bool
         +CreateTextureFromDecodedImage() bool
         +LoadFromFile() bool
-      }`, scripts: [], source: code("Client/Rendering/WicTextureLoader.cpp", "bool WicTextureLoader::DecodeFromFile", ["WicTextureLoader::DecodeFromFile", "WicTextureLoader::CreateTextureFromDecodedImage"]) },
+      }
+      WicTextureLoader --> D3D11Renderer`, links: { D3D11Renderer: "d3d11renderer" }, scripts: [], source: code("Client/Rendering/WicTextureLoader.cpp", "bool WicTextureLoader::DecodeFromFile", ["WicTextureLoader::DecodeFromFile", "WicTextureLoader::CreateTextureFromDecodedImage"]) },
   diagnosticsoverlay: { type: "class", title: "DiagnosticsOverlay", summary: "D2D/DirectWrite로 엔진 지표를 백버퍼 위에 표시합니다.", intent: "측정 결과를 실행 중 즉시 관찰합니다.", issue: "도구 자체가 장면 GPU 측정을 오염시키면 안 됩니다.", final: "장면 timestamp 종료 후 반투명 panel과 text를 렌더링합니다.", next: "device lost 시 target recreate 자동화가 필요합니다.", graph: `classDiagram
       class DiagnosticsOverlay {
         +Initialize() bool
         +Draw(text) void
-      }`, scripts: [], source: code("Client/Rendering/DiagnosticsOverlay.cpp", "bool DiagnosticsOverlay::Initialize", ["DiagnosticsOverlay::Initialize", "DiagnosticsOverlay::Draw"]) },
+      }
+      DiagnosticsOverlay --> D3D11Renderer`, links: { D3D11Renderer: "d3d11renderer" }, scripts: [], source: code("Client/Rendering/DiagnosticsOverlay.cpp", "bool DiagnosticsOverlay::Initialize", ["DiagnosticsOverlay::Initialize", "DiagnosticsOverlay::Draw"]) },
   processmemorysampler: { type: "class", title: "ProcessMemorySampler", summary: "Windows 프로세스 메모리 카운터를 snapshot으로 반환합니다.", intent: "OS 실제 지표와 엔진 추정치를 분리합니다.", issue: "Working Set 감소는 해제를 의미하지 않을 수 있습니다.", final: "GetProcessMemoryInfo로 Working/Peak/Private를 초당 한 번 수집합니다.", next: "commit charge와 GPU adapter budget을 함께 볼 수 있습니다.", graph: `classDiagram
       class ProcessMemorySampler {
         +Capture() ProcessMemorySnapshot
@@ -234,27 +236,33 @@ const nodes = {
         +workingSetBytes
         +peakWorkingSetBytes
         +privateBytes
-      }`, scripts: [], source: code("Client/Diagnostics/ProcessMemorySampler.cpp", "ProcessMemorySampler::Capture", ["ProcessMemorySampler::Capture"]) },
+      }
+      ProcessMemorySampler --> TextureResourceManager
+      ProcessMemorySampler --> D3D11Renderer`, links: { TextureResourceManager: "textureresourcemanager", D3D11Renderer: "d3d11renderer" }, scripts: [], source: code("Client/Diagnostics/ProcessMemorySampler.cpp", "ProcessMemorySampler::Capture", ["ProcessMemorySampler::Capture"]) },
   frametimeprofiler: { type: "class", title: "FrameTimeProfiler", summary: "고정 600샘플에서 percentile과 hitch count를 계산합니다.", intent: "평균에 숨는 tail latency를 관찰합니다.", issue: "측정 창 크기와 reset 시점이 결과 해석에 영향을 줍니다.", final: "고정 배열 ring buffer로 allocation 없이 최근 구간을 유지합니다.", next: "histogram과 percentile 근사 알고리즘 비교가 가능합니다.", graph: `classDiagram
       class FrameTimeProfiler {
         +RecordFrame()
         +RecordMilliseconds()
         +CaptureSnapshot()
         +Reset()
-      }`, scripts: [], source: code("Client/Diagnostics/FrameTimeProfiler.cpp", "void FrameTimeProfiler::RecordFrame", ["FrameTimeProfiler::RecordFrame", "FrameTimeProfiler::CaptureSnapshot"]) },
+      }
+      FrameTimeProfiler --> D3D11Renderer`, links: { D3D11Renderer: "d3d11renderer" }, scripts: [], source: code("Client/Diagnostics/FrameTimeProfiler.cpp", "void FrameTimeProfiler::RecordFrame", ["FrameTimeProfiler::RecordFrame", "FrameTimeProfiler::CaptureSnapshot"]) },
   renderingstressscene: { type: "class", title: "RenderingStressScene", summary: "동일한 스프라이트 배치를 100~10,000개로 생성합니다.", intent: "제출 방식만 바뀌는 통제된 부하를 제공합니다.", issue: "게임플레이 개체와 섞이면 비교 변수가 늘어납니다.", final: "진단 전용 RenderItem 배열을 별도로 생성합니다.", next: "분포·overdraw·texture variation 시나리오를 추가할 수 있습니다.", graph: `classDiagram
       class RenderingStressScene {
         +SetInstanceCount()
         +Disable()
         +RenderItems()
-      }`, scripts: [], source: code("Client/Diagnostics/RenderingStressScene.cpp", "void RenderingStressScene::SetInstanceCount", ["RenderingStressScene::SetInstanceCount"]) },
+      }
+      RenderingStressScene --> D3D11Renderer`, links: { D3D11Renderer: "d3d11renderer" }, scripts: [], source: code("Client/Diagnostics/RenderingStressScene.cpp", "void RenderingStressScene::SetInstanceCount", ["RenderingStressScene::SetInstanceCount"]) },
   benchmarksession: { type: "class", title: "BenchmarkSession", summary: "warmup·measure 단계와 시나리오 전환을 자동화합니다.", intent: "수동 타이밍 편향을 줄이고 CSV 재현성을 확보합니다.", issue: "VSync와 sample generation이 섞이면 이전 query가 결과를 오염시킬 수 있습니다.", final: "시나리오별 generation과 고정 sample 조건을 사용합니다.", next: "CI 환경 자동 실행이 다음 단계입니다.", graph: `classDiagram
       class BenchmarkSession {
         +Start()
         +Update()
         +CurrentScenario()
         +Stop()
-      }`, scripts: [], source: code("Client/Diagnostics/BenchmarkSession.cpp", "void BenchmarkSession::Start", ["BenchmarkSession::Start", "BenchmarkSession::Update"]) },
+      }
+      BenchmarkSession --> RenderingStressScene
+      BenchmarkSession --> FrameTimeProfiler`, links: { RenderingStressScene: "renderingstressscene", FrameTimeProfiler: "frametimeprofiler" }, scripts: [], source: code("Client/Diagnostics/BenchmarkSession.cpp", "void BenchmarkSession::Start", ["BenchmarkSession::Start", "BenchmarkSession::Update"]) },
   spatialgrid: { type: "class", title: "SpatialGrid", summary: "월드 좌표를 정수 cell key로 매핑하고 영역 후보를 반환합니다.", intent: "공격마다 전체 몬스터를 순회하지 않습니다.", issue: "음수 좌표에서도 truncation이 아니라 floor가 필요합니다.", final: "AABB가 걸치는 min/max cell 범위를 순회합니다.", next: "동적 update 비용을 계측할 수 있습니다.", graph: `classDiagram
       class SpatialGrid {
         +Rebuild()
@@ -279,7 +287,8 @@ const nodes = {
         +Connect() bool
         +Send() bool
         +Disconnect()
-      }`, scripts: [], source: code("Client/Network/TcpClient.cpp", "bool TcpClient::Connect", ["TcpClient::Connect", "TcpClient::Send", "TcpClient::Disconnect"]) },
+      }
+      TcpClient --> TcpListener`, links: { TcpListener: "tcplistener" }, scripts: [], source: code("Client/Network/TcpClient.cpp", "bool TcpClient::Connect", ["TcpClient::Connect", "TcpClient::Send", "TcpClient::Disconnect"]) },
   serverstatereceiver: { type: "class", title: "ServerStateReceiver", summary: "수신 스레드가 최신 snapshot을 게시하고 안전하게 종료됩니다.", intent: "blocking recv가 메인 루프를 멈추지 않게 합니다.", issue: "Stop flag만 바꾸면 recv가 깨어나지 않아 join이 멈출 수 있습니다.", final: "shutdown으로 recv를 해제하고 worker를 join합니다.", next: "stream framing buffer와 malformed packet test가 필요합니다.", graph: `classDiagram
       class ServerStateReceiver {
         +Start() bool
@@ -297,7 +306,8 @@ const nodes = {
         +Start() bool
         +Accept() SOCKET
         +Stop()
-      }`, scripts: [], source: code("Server/Network/TcpListener.cpp", "bool TcpListener::Start", ["TcpListener::Start", "TcpListener::Accept", "TcpListener::Stop"]) }
+      }
+      TcpListener --> PacketContract`, links: { PacketContract: "packet" }, scripts: [], source: code("Server/Network/TcpListener.cpp", "bool TcpListener::Start", ["TcpListener::Start", "TcpListener::Accept", "TcpListener::Stop"]) }
 };
 
 const navigationAliases = new Map([
@@ -521,9 +531,9 @@ function captureGraphBaseSize(node) {
   const naturalHeight = viewBox?.height || svg.getBBox().height || 360;
   const isClass = node.graph.startsWith("classDiagram");
   const isSequence = node.graph.startsWith("sequenceDiagram");
-  const width = isClass ? clamp(naturalWidth, 280, 500)
+  const width = isClass ? clamp(naturalWidth, 240, 420)
     : isSequence ? clamp(naturalWidth * 0.9, 640, 920)
-      : clamp(naturalWidth * 0.72, 460, 760);
+      : clamp(naturalWidth * 0.68, 420, 680);
   graphBaseSize = { width, height: Math.max(170, width * naturalHeight / naturalWidth) };
 }
 
