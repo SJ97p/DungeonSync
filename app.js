@@ -182,17 +182,28 @@ const nodes = {
   },
 
   application: { type: "class", title: "Application", summary: "초기화 순서와 메인 루프를 조정하는 composition root입니다.", intent: "하위 시스템의 소유권과 수명을 한곳에서 명확히 합니다.", issue: "입력·진단 문자열 조립까지 포함되어 현재 파일 크기가 커진 상태입니다.", final: "Winsock→TCP→Window→Renderer→ResourceManager 순으로 시작하고 역순으로 종료합니다.", next: "InputController와 DiagnosticsPresenter 분리가 다음 리팩터링 후보입니다.", graph: `classDiagram
-      class Application { +Run() int }
+      class Application {
+        +Run() int
+      }
       Application *-- D3D11Renderer
       Application *-- TextureResourceManager
       Application *-- ServerStateReceiver
       Application *-- DemoScene`, scripts: [], source: code("Client/Application.cpp", "int Application::Run", ["Application::Run"]) },
   d3d11renderer: { type: "class", title: "D3D11Renderer", summary: "DX11 자원과 렌더 패스를 소유합니다.", intent: "장면 제출과 GPU 자원 수명을 한 컴포넌트가 관리합니다.", issue: "패스가 늘면 단일 클래스가 커질 수 있습니다.", final: "배경·지면·스프라이트, GPU query, Present 구간을 명확한 순서로 실행합니다.", next: "RenderGraph 또는 pass 객체 분리를 고려할 수 있습니다.", graph: `classDiagram
-      class D3D11Renderer { +Initialize() bool +Render() void +UploadDecodedTexture() bool }
+      class D3D11Renderer {
+        +Initialize() bool
+        +Render() void
+        +UploadDecodedTexture() bool
+      }
       D3D11Renderer *-- DiagnosticsOverlay
       D3D11Renderer *-- WicTextureLoader`, scripts: [], source: code("Client/Rendering/D3D11Renderer.cpp", "void D3D11Renderer::Render", ["D3D11Renderer::Render", "D3D11Renderer::UploadDecodedTexture"]) },
   asynctextureloader: { type: "class", title: "AsyncTextureLoader", summary: "bounded producer-consumer queue와 worker lifetime을 관리합니다.", intent: "CPU 디코드를 메인 루프에서 분리합니다.", issue: "완료 큐가 가득 찰 때 worker가 안전하게 대기해야 합니다.", final: "condition_variable predicate에 stop과 queue 상태를 포함하고 Stop에서 notify_all 후 join합니다.", next: "우선순위·취소·다중 worker 정책이 확장점입니다.", graph: `classDiagram
-      class AsyncTextureLoader { +Start() bool +Request(path) optional~id~ +TryPopCompleted() bool +Stop() void }
+      class AsyncTextureLoader {
+        +Start() bool
+        +Request(path) optional~id~
+        +TryPopCompleted() bool
+        +Stop() void
+      }
       AsyncTextureLoader *-- WicTextureLoader`, scripts: [], source: code("Client/Rendering/AsyncTextureLoader.cpp", "bool AsyncTextureLoader::Start", ["AsyncTextureLoader::Start", "AsyncTextureLoader::Request", "AsyncTextureLoader::WorkerMain", "AsyncTextureLoader::Stop"]) },
   textureresourcemanager: { type: "class", title: "TextureResourceManager", summary: "요청 상태, 캐시, 메인 스레드 업로드와 메모리 통계를 관리합니다.", intent: "비동기 작업과 렌더러 사이의 정책 계층입니다.", issue: "GPU API 호출 위치와 resource state 전이가 명확해야 합니다.", final: "Unloaded→Queued→ReadyForUpload→Ready/Failed 상태와 path cache를 유지합니다.", next: "Eviction policy와 resource group dependency가 필요합니다.", graph: `stateDiagram-v2
       [*] --> Unloaded
@@ -202,37 +213,87 @@ const nodes = {
       Queued --> Failed
       ReadyForUpload --> Failed`, scripts: [], source: code("Client/Rendering/TextureResourceManager.cpp", "bool TextureResourceManager::RequestAsync", ["TextureResourceManager::RequestAsync", "TextureResourceManager::Update", "TextureResourceManager::Statistics"]) },
   wictextureloader: { type: "class", title: "WicTextureLoader", summary: "WIC 파일 디코드와 D3D11 texture creation을 분리합니다.", intent: "CPU 작업과 GPU 작업의 경계를 API에 반영합니다.", issue: "COM apartment와 WIC factory는 worker 소유권이 필요합니다.", final: "DecodeFromFile은 RGBA8 pixels, CreateTextureFromDecodedImage는 SRV를 생성합니다.", next: "mipmap 생성과 압축 포맷 지원이 남아 있습니다.", graph: `classDiagram
-      class WicTextureLoader { +Initialize() bool +DecodeFromFile() bool +CreateTextureFromDecodedImage() bool +LoadFromFile() bool }`, scripts: [], source: code("Client/Rendering/WicTextureLoader.cpp", "bool WicTextureLoader::DecodeFromFile", ["WicTextureLoader::DecodeFromFile", "WicTextureLoader::CreateTextureFromDecodedImage"]) },
+      class WicTextureLoader {
+        +Initialize() bool
+        +DecodeFromFile() bool
+        +CreateTextureFromDecodedImage() bool
+        +LoadFromFile() bool
+      }`, scripts: [], source: code("Client/Rendering/WicTextureLoader.cpp", "bool WicTextureLoader::DecodeFromFile", ["WicTextureLoader::DecodeFromFile", "WicTextureLoader::CreateTextureFromDecodedImage"]) },
   diagnosticsoverlay: { type: "class", title: "DiagnosticsOverlay", summary: "D2D/DirectWrite로 엔진 지표를 백버퍼 위에 표시합니다.", intent: "측정 결과를 실행 중 즉시 관찰합니다.", issue: "도구 자체가 장면 GPU 측정을 오염시키면 안 됩니다.", final: "장면 timestamp 종료 후 반투명 panel과 text를 렌더링합니다.", next: "device lost 시 target recreate 자동화가 필요합니다.", graph: `classDiagram
-      class DiagnosticsOverlay { +Initialize() bool +Draw(text) void }`, scripts: [], source: code("Client/Rendering/DiagnosticsOverlay.cpp", "bool DiagnosticsOverlay::Initialize", ["DiagnosticsOverlay::Initialize", "DiagnosticsOverlay::Draw"]) },
+      class DiagnosticsOverlay {
+        +Initialize() bool
+        +Draw(text) void
+      }`, scripts: [], source: code("Client/Rendering/DiagnosticsOverlay.cpp", "bool DiagnosticsOverlay::Initialize", ["DiagnosticsOverlay::Initialize", "DiagnosticsOverlay::Draw"]) },
   processmemorysampler: { type: "class", title: "ProcessMemorySampler", summary: "Windows 프로세스 메모리 카운터를 snapshot으로 반환합니다.", intent: "OS 실제 지표와 엔진 추정치를 분리합니다.", issue: "Working Set 감소는 해제를 의미하지 않을 수 있습니다.", final: "GetProcessMemoryInfo로 Working/Peak/Private를 초당 한 번 수집합니다.", next: "commit charge와 GPU adapter budget을 함께 볼 수 있습니다.", graph: `classDiagram
-      class ProcessMemorySampler { +Capture() ProcessMemorySnapshot }
-      class ProcessMemorySnapshot { +workingSetBytes +peakWorkingSetBytes +privateBytes }`, scripts: [], source: code("Client/Diagnostics/ProcessMemorySampler.cpp", "ProcessMemorySampler::Capture", ["ProcessMemorySampler::Capture"]) },
+      class ProcessMemorySampler {
+        +Capture() ProcessMemorySnapshot
+      }
+      class ProcessMemorySnapshot {
+        +workingSetBytes
+        +peakWorkingSetBytes
+        +privateBytes
+      }`, scripts: [], source: code("Client/Diagnostics/ProcessMemorySampler.cpp", "ProcessMemorySampler::Capture", ["ProcessMemorySampler::Capture"]) },
   frametimeprofiler: { type: "class", title: "FrameTimeProfiler", summary: "고정 600샘플에서 percentile과 hitch count를 계산합니다.", intent: "평균에 숨는 tail latency를 관찰합니다.", issue: "측정 창 크기와 reset 시점이 결과 해석에 영향을 줍니다.", final: "고정 배열 ring buffer로 allocation 없이 최근 구간을 유지합니다.", next: "histogram과 percentile 근사 알고리즘 비교가 가능합니다.", graph: `classDiagram
-      class FrameTimeProfiler { +RecordFrame() +RecordMilliseconds() +CaptureSnapshot() +Reset() }`, scripts: [], source: code("Client/Diagnostics/FrameTimeProfiler.cpp", "void FrameTimeProfiler::RecordFrame", ["FrameTimeProfiler::RecordFrame", "FrameTimeProfiler::CaptureSnapshot"]) },
+      class FrameTimeProfiler {
+        +RecordFrame()
+        +RecordMilliseconds()
+        +CaptureSnapshot()
+        +Reset()
+      }`, scripts: [], source: code("Client/Diagnostics/FrameTimeProfiler.cpp", "void FrameTimeProfiler::RecordFrame", ["FrameTimeProfiler::RecordFrame", "FrameTimeProfiler::CaptureSnapshot"]) },
   renderingstressscene: { type: "class", title: "RenderingStressScene", summary: "동일한 스프라이트 배치를 100~10,000개로 생성합니다.", intent: "제출 방식만 바뀌는 통제된 부하를 제공합니다.", issue: "게임플레이 개체와 섞이면 비교 변수가 늘어납니다.", final: "진단 전용 RenderItem 배열을 별도로 생성합니다.", next: "분포·overdraw·texture variation 시나리오를 추가할 수 있습니다.", graph: `classDiagram
-      class RenderingStressScene { +SetInstanceCount() +Disable() +RenderItems() }`, scripts: [], source: code("Client/Diagnostics/RenderingStressScene.cpp", "void RenderingStressScene::SetInstanceCount", ["RenderingStressScene::SetInstanceCount"]) },
+      class RenderingStressScene {
+        +SetInstanceCount()
+        +Disable()
+        +RenderItems()
+      }`, scripts: [], source: code("Client/Diagnostics/RenderingStressScene.cpp", "void RenderingStressScene::SetInstanceCount", ["RenderingStressScene::SetInstanceCount"]) },
   benchmarksession: { type: "class", title: "BenchmarkSession", summary: "warmup·measure 단계와 시나리오 전환을 자동화합니다.", intent: "수동 타이밍 편향을 줄이고 CSV 재현성을 확보합니다.", issue: "VSync와 sample generation이 섞이면 이전 query가 결과를 오염시킬 수 있습니다.", final: "시나리오별 generation과 고정 sample 조건을 사용합니다.", next: "CI 환경 자동 실행이 다음 단계입니다.", graph: `classDiagram
-      class BenchmarkSession { +Start() +Update() +CurrentScenario() +Stop() }`, scripts: [], source: code("Client/Diagnostics/BenchmarkSession.cpp", "void BenchmarkSession::Start", ["BenchmarkSession::Start", "BenchmarkSession::Update"]) },
+      class BenchmarkSession {
+        +Start()
+        +Update()
+        +CurrentScenario()
+        +Stop()
+      }`, scripts: [], source: code("Client/Diagnostics/BenchmarkSession.cpp", "void BenchmarkSession::Start", ["BenchmarkSession::Start", "BenchmarkSession::Update"]) },
   spatialgrid: { type: "class", title: "SpatialGrid", summary: "월드 좌표를 정수 cell key로 매핑하고 영역 후보를 반환합니다.", intent: "공격마다 전체 몬스터를 순회하지 않습니다.", issue: "음수 좌표에서도 truncation이 아니라 floor가 필요합니다.", final: "AABB가 걸치는 min/max cell 범위를 순회합니다.", next: "동적 update 비용을 계측할 수 있습니다.", graph: `classDiagram
-      class SpatialGrid { +Rebuild() +QueryAabb() }
+      class SpatialGrid {
+        +Rebuild()
+        +QueryAabb()
+      }
       SpatialGrid --> Monster`, scripts: [], source: code("Client/Gameplay/SpatialGrid.cpp", "void SpatialGrid::Rebuild", ["SpatialGrid::Rebuild", "SpatialGrid::QueryAabb"]) },
   combatsystem: { type: "class", title: "CombatSystem", summary: "broad-phase 후보에 정확한 거리·방향 판정을 적용합니다.", intent: "후보 수집과 피격 규칙을 분리합니다.", issue: "broad phase만으로 hit를 확정하면 false positive가 생깁니다.", final: "거리 제곱과 dot product를 사용해 sqrt 없이 판정합니다.", next: "공격 shape 전략 객체로 확장할 수 있습니다.", graph: `classDiagram
-      class CombatSystem { +AttackCircle() +AttackCone() }
+      class CombatSystem {
+        +AttackCircle()
+        +AttackCone()
+      }
       CombatSystem --> SpatialGrid`, scripts: [], source: code("Client/Gameplay/CombatSystem.cpp", "CombatSystem::", ["CombatSystem::Attack", "CombatSystem::ConeAttack"]) },
   demoscene: { type: "class", title: "DemoScene", summary: "이동·점프·전투방과 RenderItem 생성을 연결합니다.", intent: "엔진 기능을 확인할 최소 플레이 환경입니다.", issue: "콘텐츠 확장보다 기술 검증 범위가 우선입니다.", final: "3개 방, 공격 이펙트 풀, 서버 위치 보정을 통합합니다.", next: "animation state와 data-driven room 정의가 남아 있습니다.", graph: `classDiagram
-      class DemoScene { +Update() +RenderItems() +ReconcilePlayerPosition() }
+      class DemoScene {
+        +Update()
+        +RenderItems()
+        +ReconcilePlayerPosition()
+      }
       DemoScene *-- CombatSystem`, scripts: [], source: code("Client/Presentation/DemoScene.cpp", "void DemoScene::Update", ["DemoScene::Update", "DemoScene::ReconcilePlayerPosition"]) },
   tcpclient: { type: "class", title: "TcpClient", summary: "SOCKET 소유권과 send lifecycle을 RAII로 관리합니다.", intent: "조기 반환과 오류에서도 소켓을 누수하지 않습니다.", issue: "복사되면 동일 SOCKET을 두 객체가 닫을 수 있습니다.", final: "복사를 삭제하고 Connect/Send/Disconnect의 소유권을 한 객체에 둡니다.", next: "partial send queue와 reconnect policy가 필요합니다.", graph: `classDiagram
-      class TcpClient { +Connect() bool +Send() bool +Disconnect() }`, scripts: [], source: code("Client/Network/TcpClient.cpp", "bool TcpClient::Connect", ["TcpClient::Connect", "TcpClient::Send", "TcpClient::Disconnect"]) },
+      class TcpClient {
+        +Connect() bool
+        +Send() bool
+        +Disconnect()
+      }`, scripts: [], source: code("Client/Network/TcpClient.cpp", "bool TcpClient::Connect", ["TcpClient::Connect", "TcpClient::Send", "TcpClient::Disconnect"]) },
   serverstatereceiver: { type: "class", title: "ServerStateReceiver", summary: "수신 스레드가 최신 snapshot을 게시하고 안전하게 종료됩니다.", intent: "blocking recv가 메인 루프를 멈추지 않게 합니다.", issue: "Stop flag만 바꾸면 recv가 깨어나지 않아 join이 멈출 수 있습니다.", final: "shutdown으로 recv를 해제하고 worker를 join합니다.", next: "stream framing buffer와 malformed packet test가 필요합니다.", graph: `classDiagram
-      class ServerStateReceiver { +Start() bool +TryConsumeLatest() bool +Stop() }
+      class ServerStateReceiver {
+        +Start() bool
+        +TryConsumeLatest() bool
+        +Stop()
+      }
       ServerStateReceiver --> TcpClient`, scripts: [], source: code("Client/Network/ServerStateReceiver.cpp", "bool ServerStateReceiver::Start", ["ServerStateReceiver::Start", "ServerStateReceiver::TryConsumeLatest", "ServerStateReceiver::Stop"]) },
   packet: { type: "class", title: "Packet Contract", summary: "클라이언트와 서버가 공유하는 고정 크기 wire contract입니다.", intent: "패킷 크기·타입·sequence를 공통 정의합니다.", issue: "TCP byte stream에는 메시지 경계가 없습니다.", final: "현재 고정 크기 packet을 정확한 byte 수만큼 수신합니다.", next: "가변 payload에는 누적 버퍼와 header validation이 필요합니다.", graph: `classDiagram
       class PlayerMovePacket
       class PlayerStatePacket`, scripts: [], source: code("Shared/Network/Packet.h", "struct PlayerMovePacket", ["PlayerMovePacket", "PlayerStatePacket"]) },
   tcplistener: { type: "class", title: "TcpListener", summary: "서버의 bind·listen·accept 수명을 관리합니다.", intent: "네트워크 시작 실패와 세션 종료를 명확히 처리합니다.", issue: "현재 단일 클라이언트 실험 범위입니다.", final: "Winsock runtime 이후 listener를 만들고 한 세션의 packet loop를 수행합니다.", next: "다중 session dispatcher와 IOCP가 확장 방향입니다.", graph: `classDiagram
-      class TcpListener { +Start() bool +Accept() SOCKET +Stop() }`, scripts: [], source: code("Server/Network/TcpListener.cpp", "bool TcpListener::Start", ["TcpListener::Start", "TcpListener::Accept", "TcpListener::Stop"]) }
+      class TcpListener {
+        +Start() bool
+        +Accept() SOCKET
+        +Stop()
+      }`, scripts: [], source: code("Server/Network/TcpListener.cpp", "bool TcpListener::Start", ["TcpListener::Start", "TcpListener::Accept", "TcpListener::Stop"]) }
 };
 
 const treeGroups = [
@@ -331,6 +392,7 @@ function renderEvidence(node) {
 }
 
 async function renderGraph(node) {
+  els.graphWrap.dataset.diagram = node.graph.startsWith("classDiagram") ? "class" : "flow";
   els.graph.removeAttribute("data-processed"); els.graph.innerHTML = node.graph;
   try {
     await mermaid.run({ nodes: [els.graph] });

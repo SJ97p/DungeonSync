@@ -342,13 +342,30 @@ body.dark-theme {
   height: auto !important;
   margin: 0;
   max-width: none !important;
-  max-height: 380px;
+  max-height: none;
+}
+
+/* 단일 클래스는 원본 Mermaid 좌표가 작다. 넓은 화면에 맞춰 늘리면 글자도 과도하게 확대된다. */
+#graph-wrap[data-diagram="class"] #graph svg {
+  width: min(100%, 420px) !important;
 }
 
 #graph .nodeLabel,
 #graph .edgeLabel,
 #graph .label,
 #graph text { font-size: 13px !important; }
+
+#graph .classTitleText,
+#graph .classText,
+#graph .classText tspan,
+#graph .classTitleText tspan {
+  font-size: 11px !important;
+}
+
+#graph .classGroup rect {
+  rx: 4px;
+  ry: 4px;
+}
 
 #graph .node rect,
 #graph .node polygon,
