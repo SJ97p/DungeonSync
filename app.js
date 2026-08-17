@@ -166,13 +166,16 @@ const nodes = {
     issue: "TCP는 순서와 신뢰성을 보장하지만 메시지 경계를 보장하지 않습니다. 수신 스레드와 메인 스레드가 동일 상태를 다루면 데이터 경쟁과 종료 교착 위험이 있습니다.",
     final: "20Hz 위치 패킷과 sequence를 전송하고 서버가 이동량을 검증해 snapshot을 회신합니다. Receiver는 최신 상태만 mutex로 게시하고 메인 스레드가 소비합니다. Stop flag, shutdown, join 순서로 종료합니다.",
     next: "현재 단일 클라이언트 고정 크기 실험입니다. 수신 누적 버퍼, 다중 세션, 비정상 패킷 fuzzing과 지연·손실 시뮬레이션이 다음 단계입니다.",
-    graph: `flowchart LR
-      INPUT[클라이언트 입력] --> PACKET[PlayerMove 패킷<br/>sequence · x · y]
-      PACKET --> SEND[TCP 전송]
-      SEND --> VALIDATE[서버 이동량 검증]
-      VALIDATE --> SNAPSHOT[PlayerStateSnapshot]
-      SNAPSHOT --> RECEIVER[ServerStateReceiver<br/>최신 상태 게시]
-      RECEIVER --> RECONCILE[클라이언트 위치 보정<br/>Snap / 보간]`,
+    graph: `sequenceDiagram
+      participant C as 클라이언트 메인
+      participant S as TCP 서버
+      participant R as 수신 스레드
+      C->>S: PlayerMove(sequence, x, y)
+      S->>S: 이동량 검증
+      S->>R: PlayerStateSnapshot
+      R->>R: mutex로 최신 상태 게시
+      C->>R: TryConsumeLatest
+      C->>C: Snap 또는 보간`,
     links: {},
     scripts: ["tcpclient", "serverstatereceiver", "packet", "tcplistener", "application"],
     evidence: []

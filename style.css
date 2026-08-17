@@ -332,14 +332,17 @@ body.dark-theme {
 
 #graph {
   min-width: 620px;
-  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 #graph svg {
   display: block;
-  margin: 0 auto;
+  width: min(100%, 1120px) !important;
+  height: auto !important;
+  margin: 0;
   max-width: none !important;
-  max-height: 440px;
+  max-height: 380px;
 }
 
 #graph .nodeLabel,
