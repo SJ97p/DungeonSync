@@ -213,6 +213,17 @@ namespace DungeonSync::Rendering
             return false;
         }
 
+        if (!diagnosticsOverlay_.Initialize(
+            *swapChain_.Get(),
+            width_,
+            height_))
+        {
+            OutputDebugStringA(
+                "Failed to initialize diagnostics overlay.\n");
+
+            return false;
+        }
+
         if (!CreateDepthBuffer())
         {
             return false;
@@ -289,7 +300,8 @@ namespace DungeonSync::Rendering
         swapChainDescription.SwapEffect =
             DXGI_SWAP_EFFECT_DISCARD;
 
-        UINT creationFlags = 0;
+        UINT creationFlags =
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 
 #ifdef _DEBUG
         creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -599,7 +611,8 @@ namespace DungeonSync::Rendering
     void D3D11Renderer::Render(
         const Camera& camera,
         std::span<const RenderItem> renderItems,
-        SpriteSubmissionMode submissionMode)
+        SpriteSubmissionMode submissionMode,
+        std::wstring_view diagnosticsText)
     {
         using namespace DirectX;
         statistics_ = {};
@@ -718,6 +731,8 @@ namespace DungeonSync::Rendering
                         renderSubmissionEnd -
                         renderSubmissionStart)
                     .count();
+
+            diagnosticsOverlay_.Draw(diagnosticsText);
 
             const auto presentStart =
                 std::chrono::steady_clock::now();
@@ -976,10 +991,16 @@ namespace DungeonSync::Rendering
             0);
 
         ID3D11ShaderResourceView*
+            activeGroundTexture =
+            groundTextureOverride_ != nullptr
+            ? groundTextureOverride_.Get()
+            : groundTexture_
+            .shaderResourceView
+            .Get();
+
+        ID3D11ShaderResourceView*
             groundShaderResources[]{
-                groundTexture_
-                    .shaderResourceView
-                    .Get()
+                activeGroundTexture
         };
 
         deviceContext_->PSSetShaderResources(
@@ -1139,7 +1160,9 @@ namespace DungeonSync::Rendering
             std::milli>(
                 renderSubmissionEnd -
                 renderSubmissionStart)
-            .count();
+                .count();
+
+        diagnosticsOverlay_.Draw(diagnosticsText);
 
         // Measure Present wait separately.
         const auto presentStart =
@@ -1194,7 +1217,42 @@ namespace DungeonSync::Rendering
             CreateTextureFromDecodedImage(
                 *device_.Get(),
                 image,
-                outputTexture);
+            outputTexture);
+    }
+
+    bool D3D11Renderer::LoadTextureSynchronously(
+        const std::filesystem::path& path,
+        LoadedTexture& outputTexture)
+    {
+        if (device_ == nullptr)
+        {
+            return false;
+        }
+
+        return textureLoader_.LoadFromFile(
+            *device_.Get(),
+            path,
+            outputTexture);
+    }
+
+    bool D3D11Renderer::SetGroundTextureOverride(
+        const LoadedTexture* texture) noexcept
+    {
+        if (texture == nullptr)
+        {
+            groundTextureOverride_.Reset();
+            return true;
+        }
+
+        if (texture->shaderResourceView == nullptr)
+        {
+            return false;
+        }
+
+        groundTextureOverride_ =
+            texture->shaderResourceView;
+
+        return true;
     }
 
     void D3D11Renderer::

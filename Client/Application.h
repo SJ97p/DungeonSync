@@ -2,7 +2,7 @@
 
 #include "Platform/Window.h"
 #include "Rendering/D3D11Renderer.h"
-#include "Rendering/AsyncTextureLoader.h"
+#include "Rendering/TextureResourceManager.h"
 #include "Presentation/DemoScene.h"
 #include "Network/TcpClient.h"
 #include "Network/ServerStateReceiver.h"
@@ -14,6 +14,8 @@
 
 #include <WinSock2.h>
 #include <Windows.h>
+
+#include <vector>
 
 namespace DungeonSync
 {
@@ -39,8 +41,10 @@ namespace DungeonSync
 
         Platform::Window window_;
         Rendering::D3D11Renderer renderer_;
-        Rendering::AsyncTextureLoader
-            asyncTextureLoader_;
+        Rendering::TextureResourceManager
+            textureResourceManager_;
+        std::vector<Rendering::LoadedTexture>
+            synchronousTextureSet_;
         Diagnostics::FrameTimeProfiler frameTimeProfiler_;
         Diagnostics::FrameTimeProfiler
             cpuSubmissionProfiler_;

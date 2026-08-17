@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "../Shared/Network/Packet.h"
+#include "Diagnostics/ProcessMemorySampler.h"
 
 #include <algorithm>
 #include <chrono>
@@ -11,6 +12,8 @@
 #include <thread>
 #include <array>
 #include <filesystem>
+#include <string>
+#include <utility>
 
 namespace
 {
@@ -112,44 +115,32 @@ namespace DungeonSync
             return EXIT_FAILURE;
         }
 
-        if (!asyncTextureLoader_.Start())
+        if (!textureResourceManager_.Start(
+            renderer_))
         {
             OutputDebugStringA(
-                "Failed to start async texture loader.\n");
+                "Failed to start texture resource manager.\n");
 
             return EXIT_FAILURE;
         }
 
-        const std::filesystem::path
-            asyncTextureTestPath{
-                L"Assets/Textures/Environment/"
-                L"floor_stone_b.png"
+        const std::array<std::filesystem::path, 7>
+            textureLoadTestPaths{
+                L"Assets/Textures/Environment/floor_stone_a.png",
+                L"Assets/Textures/Environment/floor_stone_b.png",
+                L"Assets/Textures/Environment/aqueduct_far_background.png",
+                L"Assets/Textures/Sprites/dungeon_sprite_atlas.png",
+                L"Assets/Textures/Sprites/monster_golem_boss.png",
+                L"Assets/Textures/Sprites/monster_imp.png",
+                L"Assets/Textures/Sprites/vfx_masks.png"
         };
 
-        const std::optional<std::uint64_t>
-            asyncTextureRequestId =
-            asyncTextureLoader_.Request(
-                asyncTextureTestPath);
+        constexpr std::size_t GroundTextureTestIndex = 1;
 
-        if (!asyncTextureRequestId.has_value())
-        {
-            OutputDebugStringA(
-                "Failed to queue async texture request.\n");
+        const std::filesystem::path& asyncTextureTestPath =
+            textureLoadTestPaths[GroundTextureTestIndex];
 
-            return EXIT_FAILURE;
-        }
-
-        char asyncRequestMessage[192]{};
-
-        std::snprintf(
-            asyncRequestMessage,
-            sizeof(asyncRequestMessage),
-            "Async texture request queued"
-            " | request: %llu\n",
-            static_cast<unsigned long long>(
-                asyncTextureRequestId.value()));
-
-        OutputDebugStringA(asyncRequestMessage);
+        bool streamedTextureReadyWasLogged = false;
 
         auto previousTime =
             std::chrono::steady_clock::now();
@@ -173,6 +164,15 @@ namespace DungeonSync
         bool restartWasDown = false;
         bool benchmarkStartWasDown = false;
         bool benchmarkCancelWasDown = false;
+        bool synchronousGroundLoadWasDown = false;
+        bool asyncGroundLoadWasDown = false;
+        bool groundResetWasDown = false;
+        bool diagnosticsOverlayWasDown = false;
+        bool diagnosticsOverlayEnabled = false;
+
+        std::wstring diagnosticsOverlayText{
+            L"DUNGEONSYNC ENGINE DIAGNOSTICS\nCollecting samples..."
+        };
 
         std::array<bool, 5>
             stressKeyWasDown{};
@@ -267,77 +267,77 @@ namespace DungeonSync
             frameTimeProfiler_.RecordFrame(
                 frameElapsed.count());
 
-            Rendering::AsyncTextureLoadResult
-                completedTextureLoad{};
+            textureResourceManager_.Update();
 
-            if (asyncTextureLoader_.TryPopCompleted(
-                completedTextureLoad))
+            const bool streamedTextureSetIsReady =
+                std::ranges::all_of(
+                    textureLoadTestPaths,
+                    [this](const std::filesystem::path& path)
+                    {
+                        return textureResourceManager_.State(path) ==
+                            Rendering::TextureLoadState::Ready;
+                    });
+
+            if (!streamedTextureReadyWasLogged &&
+                streamedTextureSetIsReady)
             {
-                Rendering::LoadedTexture uploadedTexture{};
+                const Rendering::LoadedTexture*
+                    streamedTexture =
+                    textureResourceManager_.Find(
+                        asyncTextureTestPath);
 
-                const auto uploadStart =
-                    std::chrono::steady_clock::now();
+                const Rendering::
+                    TextureResourceManagerStatistics
+                    resourceStatistics =
+                    textureResourceManager_.Statistics();
 
-                const bool uploadSucceeded =
-                    completedTextureLoad.succeeded &&
-                    renderer_.UploadDecodedTexture(
-                        completedTextureLoad.image,
-                        uploadedTexture);
+                if (streamedTexture != nullptr)
+                {
+                    const bool groundTextureSwitched =
+                        renderer_.SetGroundTextureOverride(
+                            streamedTexture);
 
-                const auto uploadEnd =
-                    std::chrono::steady_clock::now();
+                    char readyMessage[448]{};
 
-                const float uploadMilliseconds =
-                    std::chrono::duration<
-                    float,
-                    std::milli>(
-                        uploadEnd - uploadStart)
-                    .count();
+                    std::snprintf(
+                        readyMessage,
+                        sizeof(readyMessage),
+                        "Async texture set ready"
+                        " | ground switched: %s"
+                        " | textures: %zu"
+                        " | width: %u"
+                        " | height: %u"
+                        " | resources: %zu"
+                        " | ready: %zu"
+                        " | GPU bytes: %llu"
+                        " | decode: %.3f ms"
+                        " | upload: %.3f ms"
+                        " | request-to-ready: %.3f ms"
+                        " | peak decoded bytes: %zu\n",
+                        groundTextureSwitched
+                        ? "true"
+                        : "false",
+                        textureLoadTestPaths.size(),
+                        streamedTexture->width,
+                        streamedTexture->height,
+                        resourceStatistics.resourceCount,
+                        resourceStatistics.readyResourceCount,
+                        static_cast<unsigned long long>(
+                            resourceStatistics
+                            .estimatedGpuBytes),
+                        resourceStatistics
+                        .lastDecodeMilliseconds,
+                        resourceStatistics
+                        .lastUploadMilliseconds,
+                        resourceStatistics
+                        .lastRequestToReadyMilliseconds,
+                        resourceStatistics
+                        .peakDecodedBytes);
 
-                const std::uint64_t estimatedGpuBytes =
-                    static_cast<std::uint64_t>(
-                        completedTextureLoad.image.width) *
-                    completedTextureLoad.image.height *
-                    4ULL;
+                    OutputDebugStringA(readyMessage);
 
-                const Rendering::AsyncTextureLoaderStatistics
-                    loaderStatistics =
-                    asyncTextureLoader_.Statistics();
-
-                char completedMessage[384]{};
-
-                std::snprintf(
-                    completedMessage,
-                    sizeof(completedMessage),
-                    "Async texture load completed"
-                    " | request: %llu"
-                    " | decode success: %s"
-                    " | upload success: %s"
-                    " | width: %u"
-                    " | height: %u"
-                    " | bytes: %zu"
-                    " | decode: %.3f ms"
-                    " | upload: %.3f ms"
-                    " | estimated GPU bytes: %llu"
-                    " | peak decoded bytes: %zu\n",
-                    static_cast<unsigned long long>(
-                        completedTextureLoad.requestId),
-                    completedTextureLoad.succeeded
-                    ? "true"
-                    : "false",
-                    uploadSucceeded
-                    ? "true"
-                    : "false",
-                    completedTextureLoad.image.width,
-                    completedTextureLoad.image.height,
-                    completedTextureLoad.image.pixels.size(),
-                    completedTextureLoad.decodeMilliseconds,
-                    uploadMilliseconds,
-                    static_cast<unsigned long long>(
-                        estimatedGpuBytes),
-                    loaderStatistics.peakDecodedBytes);
-
-                OutputDebugStringA(completedMessage);
+                    streamedTextureReadyWasLogged = true;
+                }
             }
 
             serverLogElapsedSeconds +=
@@ -415,11 +415,11 @@ namespace DungeonSync
 
             constexpr std::array<int, 5>
                 StressKeys{
-                    VK_F1,
-                    VK_F2,
-                    VK_F3,
-                    VK_F4,
-                    VK_F5
+                    '1',
+                    '2',
+                    '3',
+                    '4',
+                    '5'
             };
 
             constexpr std::array<std::size_t, 5>
@@ -502,7 +502,7 @@ namespace DungeonSync
             }
 
             const bool submissionModeToggleIsDown =
-                (GetAsyncKeyState(VK_F6) &
+                (GetAsyncKeyState('6') &
                     0x8000) != 0;
 
             const bool submissionModeTogglePressed =
@@ -518,7 +518,7 @@ namespace DungeonSync
                 if (!renderingStressScene_.IsActive())
                 {
                     OutputDebugStringA(
-                        "F6 ignored."
+                        "6 ignored."
                         " Enable a stress scene first.\n");
                 }
                 else if (stressSubmissionMode ==
@@ -562,7 +562,7 @@ namespace DungeonSync
             }
 
             const bool benchmarkStartIsDown =
-                (GetAsyncKeyState(VK_F8) &
+                (GetAsyncKeyState('7') &
                     0x8000) != 0;
 
             const bool benchmarkStartPressed =
@@ -573,7 +573,7 @@ namespace DungeonSync
                 benchmarkStartIsDown;
 
             const bool benchmarkCancelIsDown =
-                (GetAsyncKeyState(VK_F9) &
+                (GetAsyncKeyState('8') &
                     0x8000) != 0;
 
             const bool benchmarkCancelPressed =
@@ -582,6 +582,247 @@ namespace DungeonSync
 
             benchmarkCancelWasDown =
                 benchmarkCancelIsDown;
+
+            const bool synchronousGroundLoadIsDown =
+                (GetAsyncKeyState('9') &
+                    0x8000) != 0;
+
+            const bool synchronousGroundLoadPressed =
+                synchronousGroundLoadIsDown &&
+                !synchronousGroundLoadWasDown;
+
+            synchronousGroundLoadWasDown =
+                synchronousGroundLoadIsDown;
+
+            const bool asyncGroundLoadIsDown =
+                (GetAsyncKeyState('0') &
+                    0x8000) != 0;
+
+            const bool asyncGroundLoadPressed =
+                asyncGroundLoadIsDown &&
+                !asyncGroundLoadWasDown;
+
+            asyncGroundLoadWasDown =
+                asyncGroundLoadIsDown;
+
+            const bool groundResetIsDown =
+                (GetAsyncKeyState(VK_OEM_PLUS) &
+                    0x8000) != 0;
+
+            const bool groundResetPressed =
+                groundResetIsDown &&
+                !groundResetWasDown;
+
+            groundResetWasDown =
+                groundResetIsDown;
+
+            const bool diagnosticsOverlayIsDown =
+                (GetAsyncKeyState(VK_OEM_MINUS) &
+                    0x8000) != 0;
+
+            const bool diagnosticsOverlayPressed =
+                diagnosticsOverlayIsDown &&
+                !diagnosticsOverlayWasDown;
+
+            diagnosticsOverlayWasDown =
+                diagnosticsOverlayIsDown;
+
+            if (diagnosticsOverlayPressed)
+            {
+                diagnosticsOverlayEnabled =
+                    !diagnosticsOverlayEnabled;
+
+                OutputDebugStringA(
+                    diagnosticsOverlayEnabled
+                    ? "Diagnostics overlay enabled.\n"
+                    : "Diagnostics overlay disabled.\n");
+            }
+
+            if (synchronousGroundLoadPressed)
+            {
+                if (benchmarkSession_.IsActive())
+                {
+                    OutputDebugStringA(
+                        "9 ignored during benchmark.\n");
+                }
+                else
+                {
+                    const auto loadStartTime =
+                        std::chrono::steady_clock::now();
+
+                    std::vector<Rendering::LoadedTexture>
+                        loadedTextures;
+
+                    loadedTextures.reserve(
+                        textureLoadTestPaths.size());
+
+                    bool loadSucceeded = true;
+                    std::uint64_t estimatedGpuBytes = 0;
+
+                    for (const std::filesystem::path& path :
+                        textureLoadTestPaths)
+                    {
+                        Rendering::LoadedTexture loadedTexture{};
+
+                        if (!renderer_.LoadTextureSynchronously(
+                            path,
+                            loadedTexture))
+                        {
+                            loadSucceeded = false;
+                            break;
+                        }
+
+                        estimatedGpuBytes +=
+                            static_cast<std::uint64_t>(
+                                loadedTexture.width) *
+                            loadedTexture.height *
+                            4ULL;
+
+                        loadedTextures.push_back(
+                            std::move(loadedTexture));
+                    }
+
+                    const auto loadEndTime =
+                        std::chrono::steady_clock::now();
+
+                    const float loadMilliseconds =
+                        std::chrono::duration<float, std::milli>(
+                            loadEndTime - loadStartTime).count();
+
+                    const std::size_t loadedTextureCount =
+                        loadedTextures.size();
+
+                    bool switched = false;
+
+                    if (loadSucceeded)
+                    {
+                        synchronousTextureSet_ =
+                            std::move(loadedTextures);
+
+                        switched =
+                            renderer_.SetGroundTextureOverride(
+                                &synchronousTextureSet_[
+                                    GroundTextureTestIndex]);
+                    }
+
+                    char message[320]{};
+
+                    std::snprintf(
+                        message,
+                        sizeof(message),
+                        "9 synchronous texture set completed"
+                        " | success: %s"
+                        " | ground switched: %s"
+                        " | textures: %zu"
+                        " | estimated GPU bytes: %llu"
+                        " | main-thread stall: %.3f ms\n",
+                        loadSucceeded ? "true" : "false",
+                        switched ? "true" : "false",
+                        loadedTextureCount,
+                        static_cast<unsigned long long>(
+                            estimatedGpuBytes),
+                        loadMilliseconds);
+
+                    OutputDebugStringA(message);
+                }
+            }
+
+            if (asyncGroundLoadPressed)
+            {
+                if (benchmarkSession_.IsActive())
+                {
+                    OutputDebugStringA(
+                        "0 ignored during benchmark.\n");
+                }
+                else
+                {
+                    if (streamedTextureSetIsReady)
+                    {
+                        const Rendering::LoadedTexture*
+                            cachedTexture =
+                            textureResourceManager_.Find(
+                                asyncTextureTestPath);
+
+                        const bool switched =
+                            renderer_.SetGroundTextureOverride(
+                                cachedTexture);
+
+                        streamedTextureReadyWasLogged = true;
+
+                        OutputDebugStringA(
+                            switched
+                            ? "0 texture set cache hit"
+                              " | floor_stone_b applied.\n"
+                            : "0 texture set cache hit"
+                              " | failed to apply texture.\n");
+                    }
+                    else
+                    {
+                        std::size_t queuedCount = 0;
+                        std::size_t existingCount = 0;
+
+                        for (const std::filesystem::path& path :
+                            textureLoadTestPaths)
+                        {
+                            const Rendering::TextureLoadState state =
+                                textureResourceManager_.State(path);
+
+                            if (state ==
+                                Rendering::TextureLoadState::Unloaded ||
+                                state ==
+                                Rendering::TextureLoadState::Failed)
+                            {
+                                if (textureResourceManager_.RequestAsync(
+                                    path))
+                                {
+                                    ++queuedCount;
+                                }
+                            }
+                            else
+                            {
+                                ++existingCount;
+                            }
+                        }
+
+                        streamedTextureReadyWasLogged = false;
+
+                        char queuedMessage[192]{};
+
+                        std::snprintf(
+                            queuedMessage,
+                            sizeof(queuedMessage),
+                            "0 async texture set requested"
+                            " | queued: %zu"
+                            " | existing: %zu"
+                            " | total: %zu\n",
+                            queuedCount,
+                            existingCount,
+                            textureLoadTestPaths.size());
+
+                        OutputDebugStringA(queuedMessage);
+                    }
+                }
+            }
+
+            if (groundResetPressed)
+            {
+                if (benchmarkSession_.IsActive())
+                {
+                    OutputDebugStringA(
+                        "= ignored during benchmark.\n");
+                }
+                else
+                {
+                    (void)renderer_.SetGroundTextureOverride(
+                        nullptr);
+
+                    streamedTextureReadyWasLogged = true;
+
+                    OutputDebugStringA(
+                        "= ground texture reset"
+                        " | floor_stone_a applied.\n");
+                }
+            }
 
             if (benchmarkStartPressed &&
                 !benchmarkSession_.IsActive())
@@ -593,7 +834,7 @@ namespace DungeonSync
                 OutputDebugStringA(
                     "Automated benchmark started"
                     " | presentation: immediate"
-                    " | press F9 to cancel.\n");
+                    " | press 8 to cancel.\n");
             }
 
             if (benchmarkCancelPressed &&
@@ -918,18 +1159,26 @@ namespace DungeonSync
             }
 
 
+            const std::wstring_view diagnosticsText =
+                diagnosticsOverlayEnabled
+                ? std::wstring_view(diagnosticsOverlayText)
+                : std::wstring_view{};
+
             if (renderingStressScene_.IsActive())
             {
                 renderer_.Render(
                     demoScene_.GetCamera(),
                     renderingStressScene_.RenderItems(),
-                    stressSubmissionMode);
+                    stressSubmissionMode,
+                    diagnosticsText);
             }
             else
             {
                 renderer_.Render(
                     demoScene_.GetCamera(),
-                    demoScene_.RenderItems());
+                    demoScene_.RenderItems(),
+                    Rendering::SpriteSubmissionMode::InstancedBatch,
+                    diagnosticsText);
             }
 
             const Rendering::RenderStatistics&
@@ -991,7 +1240,90 @@ namespace DungeonSync
                     gpuSnapshot =
                     gpuProfiler_.CaptureSnapshot();
 
-                char message[512]{};
+                const Rendering::
+                    TextureResourceManagerStatistics
+                    textureStatistics =
+                    textureResourceManager_.Statistics();
+
+                const Diagnostics::ProcessMemorySnapshot
+                    processMemory =
+                    Diagnostics::ProcessMemorySampler::Capture();
+
+                constexpr double BytesPerMebibyte =
+                    1024.0 * 1024.0;
+
+                const std::uint64_t instanceBufferBytes =
+                    static_cast<std::uint64_t>(
+                        statistics.instanceBufferCapacity) *
+                    sizeof(Rendering::InstanceData);
+
+                const std::uint64_t trackedGpuBytes =
+                    textureStatistics.estimatedGpuBytes +
+                    instanceBufferBytes;
+
+                wchar_t overlayBuffer[1024]{};
+
+                std::swprintf(
+                    overlayBuffer,
+                    std::size(overlayBuffer),
+                    L"DUNGEONSYNC ENGINE DIAGNOSTICS [-]\n"
+                    L"Frame  FPS %6.1f | Avg %6.3f ms | P99 %6.3f ms | Max %7.3f ms\n"
+                    L"Hitch  >16.67ms %zu/%zu | >33.33ms %zu/%zu\n"
+                    L"Render Draw %zu | Submitted %zu | Visible %zu | Dropped %zu\n"
+                    L"Timing CPU P99 %6.3f ms | GPU P99 %6.3f ms | Present P99 %6.3f ms\n"
+                    L"Buffer Instance capacity %zu | %.2f KiB\n"
+                    L"Texture Ready %zu/%zu | GPU %.2f MiB | Decoded pending %.2f MiB\n"
+                    L"Stream  Queued %zu | Completed %zu | Decoding %s | Peak decoded %.2f MiB\n"
+                    L"Process Working %.2f MiB | Peak %.2f MiB | Private %.2f MiB\n"
+                    L"Tracked GPU %.2f MiB (textures + instance buffer)",
+                    framesPerSecond,
+                    frameTimeSnapshot.averageMilliseconds,
+                    frameTimeSnapshot.percentile99Milliseconds,
+                    frameTimeSnapshot.maximumMilliseconds,
+                    frameTimeSnapshot.framesOver16Milliseconds,
+                    frameTimeSnapshot.sampleCount,
+                    frameTimeSnapshot.framesOver33Milliseconds,
+                    frameTimeSnapshot.sampleCount,
+                    statistics.drawCallCount,
+                    statistics.submittedInstanceCount,
+                    statistics.instanceCount,
+                    statistics.droppedInstanceCount,
+                    cpuSubmissionSnapshot.percentile99Milliseconds,
+                    gpuSnapshot.percentile99Milliseconds,
+                    presentSnapshot.percentile99Milliseconds,
+                    statistics.instanceBufferCapacity,
+                    static_cast<double>(
+                        statistics.instanceBufferCapacity *
+                        sizeof(Rendering::InstanceData)) / 1024.0,
+                    textureStatistics.readyResourceCount,
+                    textureStatistics.resourceCount,
+                    static_cast<double>(
+                        textureStatistics.estimatedGpuBytes) /
+                        (1024.0 * 1024.0),
+                    static_cast<double>(
+                        textureStatistics.decodedBytesAwaitingUpload) /
+                        (1024.0 * 1024.0),
+                    textureStatistics.queuedRequestCount,
+                    textureStatistics.completedResultCount,
+                    textureStatistics.decoding ? L"YES" : L"NO",
+                    static_cast<double>(
+                        textureStatistics.peakDecodedBytes) /
+                        BytesPerMebibyte,
+                    static_cast<double>(
+                        processMemory.workingSetBytes) /
+                        BytesPerMebibyte,
+                    static_cast<double>(
+                        processMemory.peakWorkingSetBytes) /
+                        BytesPerMebibyte,
+                    static_cast<double>(
+                        processMemory.privateBytes) /
+                        BytesPerMebibyte,
+                    static_cast<double>(trackedGpuBytes) /
+                        BytesPerMebibyte);
+
+                diagnosticsOverlayText = overlayBuffer;
+
+                char message[640]{};
 
                 std::snprintf(
                     message,
@@ -1015,7 +1347,11 @@ namespace DungeonSync
                     " %.3f/%.3f/%.3f ms"
                     " | GPU Avg/P95/P99:"
                     " %.3f/%.3f/%.3f ms"
-                    " | GPU Samples: %zu\n",
+                    " | GPU Samples: %zu"
+                    " | Working Set: %.2f MiB"
+                    " | Peak Working Set: %.2f MiB"
+                    " | Private Bytes: %.2f MiB"
+                    " | Tracked GPU: %.2f MiB\n",
                     framesPerSecond,
                     frameTimeSnapshot.averageMilliseconds,
                     frameTimeSnapshot.percentile95Milliseconds,
@@ -1039,7 +1375,18 @@ namespace DungeonSync
                     gpuSnapshot.averageMilliseconds,
                     gpuSnapshot.percentile95Milliseconds,
                     gpuSnapshot.percentile99Milliseconds,
-                    gpuSnapshot.sampleCount);
+                    gpuSnapshot.sampleCount,
+                    static_cast<double>(
+                        processMemory.workingSetBytes) /
+                        BytesPerMebibyte,
+                    static_cast<double>(
+                        processMemory.peakWorkingSetBytes) /
+                        BytesPerMebibyte,
+                    static_cast<double>(
+                        processMemory.privateBytes) /
+                        BytesPerMebibyte,
+                    static_cast<double>(trackedGpuBytes) /
+                        BytesPerMebibyte);
 
                 OutputDebugStringA(message);
 
@@ -1088,8 +1435,10 @@ namespace DungeonSync
             }
 
         }
+        (void)renderer_.SetGroundTextureOverride(
+            nullptr);
 
-        asyncTextureLoader_.Stop();
+        textureResourceManager_.Stop();
         serverStateReceiver_.Stop();
 
         return EXIT_SUCCESS;

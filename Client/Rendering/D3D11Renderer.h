@@ -4,6 +4,7 @@
 #include "InstanceData.h"
 #include "RenderStatistics.h"
 #include "WicTextureLoader.h"
+#include "DiagnosticsOverlay.h"
 
 #include <Windows.h>
 #include <d3d11.h>
@@ -13,6 +14,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <array>
+#include <string_view>
 
 namespace DungeonSync::Rendering
 {
@@ -52,13 +54,23 @@ namespace DungeonSync::Rendering
             const DecodedImage& image,
             LoadedTexture& outputTexture);
 
+        [[nodiscard]]
+        bool LoadTextureSynchronously(
+            const std::filesystem::path& path,
+            LoadedTexture& outputTexture);
+
+        [[nodiscard]]
+        bool SetGroundTextureOverride(
+            const LoadedTexture* texture) noexcept;
+
         void BeginGpuTimingGeneration() noexcept;
 
         void Render(
             const Camera& camera,
             std::span<const RenderItem> renderItems,
             SpriteSubmissionMode submissionMode =
-            SpriteSubmissionMode::InstancedBatch);
+            SpriteSubmissionMode::InstancedBatch,
+            std::wstring_view diagnosticsText = {});
 
     private:
         struct GpuTimingQuerySet
@@ -148,7 +160,11 @@ namespace DungeonSync::Rendering
         WicTextureLoader textureLoader_{};
         LoadedTexture spriteAtlas_{};
         LoadedTexture groundTexture_{};
+        Microsoft::WRL::ComPtr<
+            ID3D11ShaderResourceView>
+            groundTextureOverride_;
         LoadedTexture backgroundTexture_{};
+        DiagnosticsOverlay diagnosticsOverlay_{};
 
         D3D_FEATURE_LEVEL featureLevel_{};
 

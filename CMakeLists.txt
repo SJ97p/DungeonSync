@@ -20,6 +20,10 @@ add_executable(DungeonSyncClient WIN32
     Client/Rendering/WicTextureLoader.h
     Client/Rendering/AsyncTextureLoader.cpp
     Client/Rendering/AsyncTextureLoader.h
+    Client/Rendering/TextureResourceManager.cpp
+    Client/Rendering/TextureResourceManager.h
+    Client/Rendering/DiagnosticsOverlay.cpp
+    Client/Rendering/DiagnosticsOverlay.h
     Client/Rendering/Vertex.h
     Client/Rendering/Camera.h
     Client/Presentation/DemoScene.cpp
@@ -49,6 +53,8 @@ add_executable(DungeonSyncClient WIN32
     Client/Diagnostics/BenchmarkCsvWriter.h
     Client/Diagnostics/BenchmarkSession.cpp
     Client/Diagnostics/BenchmarkSession.h
+    Client/Diagnostics/ProcessMemorySampler.cpp
+    Client/Diagnostics/ProcessMemorySampler.h
     Shared/Network/WinsockRuntime.cpp
     Shared/Network/WinsockRuntime.h
     Shared/Network/Packet.h
@@ -68,6 +74,9 @@ target_link_libraries(DungeonSyncClient PRIVATE
     dxgi
     d3dcompiler
     windowscodecs
+    d2d1
+    dwrite
+    psapi
     ole32
     ws2_32
 )
