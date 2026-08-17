@@ -1,10 +1,10 @@
 "use strict";
 
 const evidence = {
-  baseline: { src: "assets/evidence/diagnostics-baseline.png", caption: "기본 장면 · Draw 3 · Instance buffer 96 KiB" },
-  instanced: { src: "assets/evidence/diagnostics-10000-instanced.png", caption: "10,000 인스턴스 · Draw 3 · GPU tracked 1.50 MiB" },
-  streamed: { src: "assets/evidence/diagnostics-streamed-textures.png", caption: "비동기 텍스처 7/7 · tracked GPU 24.50 MiB · peak decoded 8 MiB" },
-  retained: { src: "assets/evidence/diagnostics-cache-retained.png", caption: "기본 지면 복귀 후 캐시와 high-water buffer 유지" },
+  baseline: { src: "Assets/evidence/diagnostics-baseline.png", caption: "기본 장면 · Draw 3 · 인스턴스 버퍼 96 KiB" },
+  instanced: { src: "Assets/evidence/diagnostics-10000-instanced.png", caption: "10,000 인스턴스 · Draw 3 · 추적 GPU 1.50 MiB" },
+  streamed: { src: "Assets/evidence/diagnostics-streamed-textures.png", caption: "비동기 텍스처 7/7 · 추적 GPU 24.50 MiB · 최대 디코드 8 MiB" },
+  retained: { src: "Assets/evidence/diagnostics-cache-retained.png", caption: "기본 지면 복귀 후 캐시와 최대 사용 버퍼 유지" },
   benchmark: { src: "Docs/Images/rendering_benchmark.svg", caption: "Release 자동 벤치마크 · Instanced vs Per-instance" }
 };
 
@@ -13,22 +13,22 @@ const code = (path, focus = "", methods = []) => ({ path, focus, methods });
 const nodes = {
   overview: {
     type: "system",
-    title: "DungeonSync Engine Lab",
+    title: "DungeonSync 엔진 연구 개요",
     summary: "DX11 온라인 게임 클라이언트의 렌더링·스트리밍·진단·네트워크 기반 기술을 작은 실험 환경에서 구현하고 수치로 검증했습니다.",
     intent: "화려한 콘텐츠 제작보다 장시간 서비스되는 온라인 게임 클라이언트가 요구하는 안정성, 관찰 가능성, 렌더링 효율을 직접 구현하고 설명 가능한 증거로 남기는 것이 목표입니다.",
     issue: "단순 데모는 화면이 동작한다는 사실만 보여줄 뿐, 병목의 위치나 개선 효과를 증명하기 어렵습니다. CPU 제출, GPU 실행, Present 대기, 리소스 로딩과 메모리를 분리해서 관찰할 필요가 있었습니다.",
     final: "D3D11 2.5D 렌더러, 인스턴싱 비교, 비동기 텍스처 파이프라인, 엔진 진단 오버레이, 공간 분할 전투, TCP 상태 동기화를 하나의 C++20 실행 환경에 결합했습니다. Debug/Release 양쪽 빌드와 재현 가능한 측정으로 검증했습니다.",
     next: "전체 VRAM 예산은 DXGI QueryVideoMemoryInfo로 확장할 수 있고, 네트워크는 다중 클라이언트 IO 모델과 패킷 시뮬레이션이 다음 실험 대상입니다. 현재 결과는 구현된 범위와 한계를 명시해 과장하지 않습니다.",
     graph: `flowchart LR
-      APP[Application] --> SCENE[DemoScene / Combat]
-      APP --> STREAM[Async Streaming]
-      APP --> NET[TCP State Sync]
-      SCENE --> RENDER[DX11 Renderer]
+      APP[Application] --> SCENE[DemoScene / 전투]
+      APP --> STREAM[비동기 스트리밍]
+      APP --> NET[TCP 상태 동기화]
+      SCENE --> RENDER[DX11 렌더러]
       STREAM --> RENDER
       RENDER --> GPU[GPU / Present]
-      RENDER --> PROF[Profiler]
-      STREAM --> MEM[Memory Metrics]
-      PROF --> HUD[Diagnostics Overlay]
+      RENDER --> PROF[성능 측정]
+      STREAM --> MEM[메모리 지표]
+      PROF --> HUD[진단 오버레이]
       MEM --> HUD`,
     links: { APP: "application", SCENE: "combat", STREAM: "streaming", NET: "network", RENDER: "renderer", PROF: "diagnostics", HUD: "diagnostics", MEM: "memory" },
     scripts: ["application", "renderer", "streaming", "diagnostics", "network"],
@@ -38,18 +38,18 @@ const nodes = {
 
   renderer: {
     type: "system",
-    title: "DX11 2.5D Rendering Pipeline",
+    title: "DX11 2.5D 렌더링 파이프라인",
     summary: "직교 카메라와 X-Z 지상 좌표계 위에 배경·지면·스프라이트 패스를 분리한 DirectX 11 렌더러입니다.",
     intent: "DX11의 디바이스, 스왑체인, 백버퍼, 깊이 버퍼와 GPU 파이프라인의 책임을 직접 다루면서 던전형 2.5D 장면에 필요한 렌더 순서를 구성했습니다.",
     issue: "불투명 지면과 알파 스프라이트는 깊이 테스트·쓰기와 블렌딩 규칙이 다릅니다. 모든 객체를 개별 호출하면 장면 규모가 커질수록 CPU/GPU 제출 비용도 증가합니다.",
     final: "배경→지면→스프라이트 순서로 패스를 분리하고, 스프라이트는 공통 메시와 텍스처를 재사용해 인스턴스 데이터만 GPU에 제출합니다. 장면 GPU timestamp query는 오버레이 패스 전에 종료합니다.",
     next: "텍스처 배열, 재질별 배칭, 가시성 컬링, 동적 해상도와 실제 GPU 메모리 예산 추적은 현재 범위 밖입니다.",
     graph: `flowchart LR
-      FRAME[Frame Begin] --> BG[Background Pass]
-      BG --> GROUND[Ground Pass]
-      GROUND --> SPRITE[Sprite Pass]
-      SPRITE --> QUERY[End GPU Query]
-      QUERY --> OVERLAY[D2D Diagnostics]
+      FRAME[프레임 시작] --> BG[배경 패스]
+      BG --> GROUND[지면 패스]
+      GROUND --> SPRITE[스프라이트 패스]
+      SPRITE --> QUERY[GPU 측정 종료]
+      QUERY --> OVERLAY[D2D 진단 오버레이]
       OVERLAY --> PRESENT[SwapChain Present]`,
     links: { SPRITE: "instancing", QUERY: "diagnostics", OVERLAY: "diagnostics" },
     scripts: ["d3d11renderer", "diagnosticsoverlay", "demoscene"],
@@ -58,19 +58,19 @@ const nodes = {
 
   instancing: {
     type: "system",
-    title: "Instancing & Submission Benchmark",
+    title: "인스턴싱 및 제출 방식 비교",
     summary: "100~10,000개 스프라이트를 동일 조건에서 Instanced와 Per-instance 제출 방식으로 비교합니다.",
     intent: "드로우콜 감소가 실제 CPU 제출과 GPU 시간에 어떤 영향을 주는지 체감이 아니라 동일 시나리오로 측정하고자 했습니다.",
     issue: "FPS만 보면 240Hz Present 대기에 가려 두 제출 방식의 차이가 작아 보입니다. CPU Submit, GPU timestamp, Present를 분리해야 원인을 볼 수 있습니다.",
     final: "10,000개에서 Draw Call을 10,002회에서 3회로 줄였습니다. Release 실행 검증에서 GPU P99는 약 6.14ms에서 0.05ms 수준으로 감소했습니다. 동적 인스턴스 버퍼는 2배 성장 전략으로 16,384 capacity를 확보합니다.",
     next: "드라이버·GPU별 반복 측정과 bootstrap confidence interval을 추가하면 결과의 통계적 신뢰도를 높일 수 있습니다.",
-    graph: `flowchart TB
-      ITEMS[10,000 RenderItems] --> A{Submission Mode}
-      A -->|Per-instance| MANY[10,000 sprite draws]
-      A -->|Instanced| ONE[1 sprite batch]
-      MANY --> METRIC[CPU / GPU / Present Metrics]
+    graph: `flowchart LR
+      ITEMS[렌더 항목<br/>10,000개] --> A{제출 방식}
+      A -->|Per-instance| MANY[스프라이트 Draw<br/>10,000회]
+      A -->|Instanced| ONE[스프라이트 Batch<br/>1회]
+      MANY --> METRIC[CPU / GPU / Present 지표]
       ONE --> METRIC
-      METRIC --> CSV[CSV Benchmark Evidence]`,
+      METRIC --> CSV[CSV 측정 결과]`,
     links: { ITEMS: "renderingstressscene", ONE: "d3d11renderer", CSV: "benchmarksession" },
     scripts: ["renderingstressscene", "d3d11renderer", "benchmarksession", "frametimeprofiler"],
     evidence: ["benchmark", "instanced"],
@@ -79,19 +79,19 @@ const nodes = {
 
   streaming: {
     type: "system",
-    title: "Asynchronous Texture Streaming",
+    title: "비동기 텍스처 스트리밍",
     summary: "CPU 디코드와 GPU 업로드를 분리하고 제한 큐·캐시·안전한 종료를 갖춘 텍스처 스트리밍 실험입니다.",
     intent: "온라인 게임에서 순간적인 리소스 로딩이 한 프레임을 막아 플레이 감각을 훼손하는 히칭을 재현하고 줄이는 것이 연구 질문입니다.",
     issue: "WIC 디코드와 GPU 리소스 생성을 메인 스레드에서 연속 수행하면 동일한 7장 로딩에서 한 프레임이 56ms 이상 멈췄습니다. 반대로 D3D context를 무분별하게 작업 스레드에서 다루면 동시성과 수명 관리가 복잡해집니다.",
     final: "Worker는 COM MTA와 WIC factory를 소유해 RGBA8 픽셀까지만 생성합니다. 완료 데이터는 bounded queue로 전달하고 메인 스레드가 프레임당 1장만 GPU에 업로드합니다. Release에서 Frame Max 57.416ms를 6.798ms로 낮추고 16.67ms 초과를 1회에서 0회로 줄였습니다.",
     next: "현재 한 개 Worker와 FIFO 정책입니다. 우선순위, 취소 토큰, 방 단위 dependency group, GPU upload budget을 추가할 수 있습니다.",
     graph: `flowchart LR
-      REQUEST[Main: Request] --> RQ[Bounded Request Queue]
-      RQ --> WORKER[Worker + WIC Decode]
-      WORKER --> CQ[Completed RGBA Queue]
-      CQ --> UPLOAD[Main: 1 Upload / Frame]
-      UPLOAD --> CACHE[Texture Cache]
-      CACHE --> DRAW[Ground Override]`,
+      REQUEST[메인 스레드 요청] --> RQ[제한 요청 큐]
+      RQ --> WORKER[Worker + WIC 디코드]
+      WORKER --> CQ[완료 RGBA 큐]
+      CQ --> UPLOAD[프레임당 1회 업로드]
+      UPLOAD --> CACHE[텍스처 캐시]
+      CACHE --> DRAW[지면 텍스처 교체]`,
     links: { WORKER: "asynctextureloader", UPLOAD: "textureresourcemanager", CACHE: "textureresourcemanager", DRAW: "d3d11renderer" },
     scripts: ["asynctextureloader", "textureresourcemanager", "wictextureloader", "d3d11renderer"],
     evidence: ["streamed", "retained"],
@@ -100,18 +100,18 @@ const nodes = {
 
   diagnostics: {
     type: "system",
-    title: "In-game Engine Diagnostics",
+    title: "인게임 엔진 진단 도구",
     summary: "프레임·제출·GPU·Present·메모리·스트리밍 상태를 런타임에서 한 화면으로 관찰합니다.",
     intent: "라이브 이슈에 대응하려면 평균 FPS가 아니라 P99, Max, 히치 횟수와 병목 구간을 즉시 확인할 수 있어야 합니다.",
     issue: "Present 대기가 포함된 Frame time만으로는 CPU 제출과 GPU 실행 비용을 구분할 수 없습니다. 진단 UI 자체가 측정 구간을 오염시키는 문제도 피해야 합니다.",
     final: "최근 600샘플의 Avg/P95/P99/Max와 16.67/33.33ms 초과 횟수를 유지합니다. D3D11 비동기 timestamp query로 GPU를 측정하고 D2D 오버레이는 장면 query 종료 뒤에 그립니다.",
     next: "오버레이 자체 비용의 별도 profiler, 지표 히스토그램, 프레임 캡처 bookmark와 원격 telemetry 전송이 확장 방향입니다.",
-    graph: `flowchart LR
-      FRAME[Frame Clock] --> FP[FrameTimeProfiler]
-      SUBMIT[CPU Submission] --> FP
-      GPUQ[D3D11 Timestamp Query] --> FP
-      PRESENT[Present Wait] --> FP
-      MEMORY[Memory Sampler] --> HUD[Diagnostics Overlay]
+    graph: `flowchart TB
+      FRAME[프레임 시간] --> FP[FrameTimeProfiler]
+      SUBMIT[CPU 제출] --> FP
+      GPUQ[D3D11 타임스탬프] --> FP
+      PRESENT[Present 대기] --> FP
+      MEMORY[메모리 측정] --> HUD[DiagnosticsOverlay]
       FP --> HUD`,
     links: { FP: "frametimeprofiler", GPUQ: "d3d11renderer", MEMORY: "processmemorysampler", HUD: "diagnosticsoverlay" },
     scripts: ["frametimeprofiler", "diagnosticsoverlay", "processmemorysampler", "d3d11renderer"],
@@ -120,18 +120,18 @@ const nodes = {
 
   memory: {
     type: "system",
-    title: "Memory Observability",
+    title: "메모리 사용량 관측",
     summary: "OS 프로세스 메모리와 엔진이 추적하는 리소스 메모리를 의도적으로 구분합니다.",
     intent: "메모리 증가를 곧바로 누수로 단정하지 않고 실제 RAM residency, private commit, 캐시, GPU 리소스 high-water mark를 구분하는 것이 목표입니다.",
     issue: "Working Set은 OS가 trimming할 수 있고 Private Bytes는 공유 불가능한 commit을 나타냅니다. 엔진 추정 GPU 값은 드라이버 전체 VRAM과 동일하지 않습니다.",
     final: "GetProcessMemoryInfo로 Working/Peak/Private를 수집하고 텍스처 RGBA8 크기와 instance capacity를 별도 합산합니다. 7장 로딩에서 tracked texture 23MiB, peak decoded 8MiB, 10,000 인스턴스에서 buffer 1.5MiB를 확인했습니다.",
     next: "현재 시작 시 직접 로딩한 기본 텍스처와 동기 비교 세트는 tracked GPU 합계에 포함되지 않습니다. DXGI adapter budget과 모든 resource registry 통합이 필요합니다.",
     graph: `flowchart TB
-      OS[Windows Process Counters] --> WS[Working Set / Private Bytes]
-      CACHE[Texture Cache] --> TEX[Estimated Texture GPU]
-      BUFFER[Instance Capacity] --> IB[Instance Buffer Bytes]
-      DECODE[Completed Pixels] --> CPU[Pending / Peak Decode]
-      TEX --> TRACKED[Tracked GPU]
+      OS[Windows 프로세스 카운터] --> WS[Working Set / Private Bytes]
+      CACHE[텍스처 캐시] --> TEX[추정 텍스처 GPU]
+      BUFFER[인스턴스 용량] --> IB[인스턴스 버퍼 크기]
+      DECODE[디코드 픽셀] --> CPU[대기 / 최대 디코드]
+      TEX --> TRACKED[추적 GPU 합계]
       IB --> TRACKED`,
     links: { OS: "processmemorysampler", CACHE: "textureresourcemanager", BUFFER: "d3d11renderer" },
     scripts: ["processmemorysampler", "textureresourcemanager", "d3d11renderer"],
@@ -140,19 +140,19 @@ const nodes = {
 
   combat: {
     type: "system",
-    title: "Spatial Combat Query",
+    title: "공간 분할 기반 전투 판정",
     summary: "Uniform Spatial Grid의 broad phase와 거리·부채꼴 narrow phase로 공격 후보를 줄입니다.",
     intent: "몬스터 수가 늘 때 모든 객체를 검사하는 대신, 판정을 놓치지 않는 저비용 후보 수집과 정확한 최종 판정을 분리합니다.",
     issue: "셀을 너무 크게 하면 후보가 많아지고 너무 작게 하면 셀 순회 비용이 늘어납니다. broad phase 결과만으로 피격을 확정하면 원 밖의 객체가 맞습니다.",
     final: "월드 좌표를 cell size로 나눠 floor한 정수 키로 저장합니다. 공격 원을 감싸는 AABB의 셀만 수집한 뒤 거리 제곱 또는 방향 dot 조건으로 최종 판정합니다.",
     next: "동적 객체 갱신 비용, 비균일 분포, 대규모 맵에서는 loose quadtree나 BVH와 비교할 수 있습니다.",
     graph: `flowchart LR
-      WORLD[Monster Positions] --> GRID[Uniform Spatial Grid]
-      ATTACK[Attack Bounds] --> CELLS[AABB Cell Range]
+      WORLD[몬스터 위치] --> GRID[Uniform Spatial Grid]
+      ATTACK[공격 범위] --> CELLS[AABB 셀 범위]
       GRID --> CELLS
-      CELLS --> BROAD[Broad-phase Candidates]
-      BROAD --> NARROW[Distance² / Cone Test]
-      NARROW --> HIT[Confirmed Hits]`,
+      CELLS --> BROAD[Broad Phase 후보]
+      BROAD --> NARROW[거리² / 부채꼴 검사]
+      NARROW --> HIT[최종 피격 대상]`,
     links: { GRID: "spatialgrid", BROAD: "combatsystem", NARROW: "combatsystem" },
     scripts: ["spatialgrid", "combatsystem", "demoscene"],
     evidence: []
@@ -160,22 +160,19 @@ const nodes = {
 
   network: {
     type: "system",
-    title: "TCP State Synchronization",
+    title: "TCP 상태 동기화",
     summary: "RAII 소켓, 고정 패킷, 수신 스레드와 서버 승인 위치 보정으로 클라이언트·서버 흐름을 구성합니다.",
     intent: "렌더링 데모를 넘어 온라인 클라이언트가 입력 예측과 authoritative 상태를 어떻게 연결하고 안전하게 종료하는지 구현합니다.",
     issue: "TCP는 순서와 신뢰성을 보장하지만 메시지 경계를 보장하지 않습니다. 수신 스레드와 메인 스레드가 동일 상태를 다루면 데이터 경쟁과 종료 교착 위험이 있습니다.",
     final: "20Hz 위치 패킷과 sequence를 전송하고 서버가 이동량을 검증해 snapshot을 회신합니다. Receiver는 최신 상태만 mutex로 게시하고 메인 스레드가 소비합니다. Stop flag, shutdown, join 순서로 종료합니다.",
     next: "현재 단일 클라이언트 고정 크기 실험입니다. 수신 누적 버퍼, 다중 세션, 비정상 패킷 fuzzing과 지연·손실 시뮬레이션이 다음 단계입니다.",
-    graph: `sequenceDiagram
-      participant C as Client Main
-      participant S as TCP Server
-      participant R as Receiver Thread
-      C->>S: PlayerMove(sequence, x, y)
-      S->>S: Validate displacement
-      S->>R: PlayerStateSnapshot
-      R->>R: Publish latest under mutex
-      C->>R: TryConsumeLatest
-      C->>C: Snap or interpolate`,
+    graph: `flowchart LR
+      INPUT[클라이언트 입력] --> PACKET[PlayerMove 패킷<br/>sequence · x · y]
+      PACKET --> SEND[TCP 전송]
+      SEND --> VALIDATE[서버 이동량 검증]
+      VALIDATE --> SNAPSHOT[PlayerStateSnapshot]
+      SNAPSHOT --> RECEIVER[ServerStateReceiver<br/>최신 상태 게시]
+      RECEIVER --> RECONCILE[클라이언트 위치 보정<br/>Snap / 보간]`,
     links: {},
     scripts: ["tcpclient", "serverstatereceiver", "packet", "tcplistener", "application"],
     evidence: []
@@ -236,10 +233,10 @@ const nodes = {
 };
 
 const treeGroups = [
-  { title: "Research Overview", ids: ["overview"] },
-  { title: "Engine Experiments", ids: ["renderer", "instancing", "streaming", "diagnostics", "memory", "combat", "network"] },
-  { title: "Rendering / Diagnostics", ids: ["d3d11renderer", "asynctextureloader", "textureresourcemanager", "wictextureloader", "diagnosticsoverlay", "processmemorysampler", "frametimeprofiler", "renderingstressscene", "benchmarksession"] },
-  { title: "Gameplay / Network", ids: ["application", "demoscene", "spatialgrid", "combatsystem", "tcpclient", "serverstatereceiver", "packet", "tcplistener"] }
+  { title: "프로젝트 개요", ids: ["overview"] },
+  { title: "엔진 연구 항목", ids: ["renderer", "instancing", "streaming", "diagnostics", "memory", "combat", "network"] },
+  { title: "렌더링 / 진단 시스템", ids: ["d3d11renderer", "asynctextureloader", "textureresourcemanager", "wictextureloader", "diagnosticsoverlay", "processmemorysampler", "frametimeprofiler", "renderingstressscene", "benchmarksession"] },
+  { title: "게임플레이 / 네트워크", ids: ["application", "demoscene", "spatialgrid", "combatsystem", "tcpclient", "serverstatereceiver", "packet", "tcplistener"] }
 ];
 
 const els = {
@@ -288,7 +285,7 @@ async function selectNode(id, options = {}) {
   els.title.textContent = node.title; els.summary.textContent = node.summary;
   els.intent.textContent = node.intent; els.issue.textContent = node.issue; els.final.textContent = node.final; els.next.textContent = node.next;
   renderBenchmark(node.report); renderScripts(node); renderEvidence(node); await renderGraph(node);
-  if (node.source) await loadCode(node.source); else { els.codePath.textContent = ""; els.codeActions.innerHTML = ""; els.codePreview.innerHTML = "<code>시스템의 Core Sources에서 클래스를 선택하세요.</code>"; }
+  if (node.source) await loadCode(node.source); else { els.codePath.textContent = ""; els.codeActions.innerHTML = ""; els.codePreview.innerHTML = "<code>시스템의 핵심 소스에서 클래스를 선택하세요.</code>"; }
 }
 
 function renderBenchmark(kind) {
@@ -296,16 +293,16 @@ function renderBenchmark(kind) {
   if (!kind) { els.benchmark.innerHTML = ""; return; }
   const common = `<div class="benchmark-kpis">
     <div class="benchmark-kpi"><strong>57.416 → 6.798ms</strong><span>동일 7장 로딩의 Frame Max</span></div>
-    <div class="benchmark-kpi"><strong>10,002 → 3</strong><span>10,000 sprites의 Draw Calls</span></div>
+    <div class="benchmark-kpi"><strong>10,002 → 3</strong><span>스프라이트 10,000개의 Draw Call</span></div>
     <div class="benchmark-kpi"><strong>0 / 600</strong><span>비동기 로딩 후 16.67ms 초과</span></div>
-    <div class="benchmark-kpi"><strong>24.50 MiB</strong><span>텍스처+인스턴스 tracked GPU</span></div>
+    <div class="benchmark-kpi"><strong>24.50 MiB</strong><span>텍스처+인스턴스 추적 GPU</span></div>
   </div>`;
   const notes = {
     overview: "구현 → 계측 → 비교 → 한계 명시의 순서로 엔진 기능을 검증했습니다.",
     rendering: "FPS가 Present에 가려질 때도 CPU/GPU/Present 구간을 분리해 제출 비용을 확인합니다.",
     streaming: "총 로딩 시간은 비슷하지만 메인 스레드의 단일 프레임 정지를 제거하는 것이 목표입니다."
   };
-  els.benchmark.innerHTML = `<div class="benchmark-hero"><p class="benchmark-kicker">MEASURED RESULT</p><h2>${nodes[currentNodeId].title}</h2><p>${notes[kind]}</p></div>${common}<div class="benchmark-note">Release · Windows x64 · 최근 600 프레임 window. 수치는 현재 장비의 측정 결과이며 전체 하드웨어에 일반화하지 않습니다.</div>`;
+  els.benchmark.innerHTML = `<div class="benchmark-hero"><p class="benchmark-kicker">측정 결과</p><h2>${nodes[currentNodeId].title}</h2><p>${notes[kind]}</p></div>${common}<div class="benchmark-note">Release · Windows x64 · 최근 600프레임 측정 구간. 수치는 현재 장비의 결과이며 전체 하드웨어에 일반화하지 않습니다.</div>`;
 }
 
 function renderScripts(node) {
@@ -332,8 +329,14 @@ function renderEvidence(node) {
 
 async function renderGraph(node) {
   els.graph.removeAttribute("data-processed"); els.graph.innerHTML = node.graph;
-  try { await mermaid.run({ nodes: [els.graph] }); attachGraphClicks(node); graphScale = 1; applyGraphScale(); }
-  catch (error) { els.graph.textContent = `Diagram error: ${error.message}`; }
+  try {
+    await mermaid.run({ nodes: [els.graph] });
+    attachGraphClicks(node);
+    graphScale = 1;
+    applyGraphScale();
+    fitGraphContainer();
+  }
+  catch (error) { els.graph.textContent = `다이어그램을 표시하지 못했습니다: ${error.message}`; }
 }
 
 function attachGraphClicks(node) {
@@ -376,6 +379,12 @@ function openMedia(item) { const dialog = document.getElementById("media-modal")
 
 function applyGraphScale() { const svg = els.graph.querySelector("svg"); if (svg) { svg.style.transform = `scale(${graphScale})`; svg.style.transformOrigin = "top left"; } document.getElementById("zoom-reset").textContent = `${Math.round(graphScale * 100)}%`; }
 function setGraphScale(value) { graphScale = Math.max(0.55, Math.min(2.2, value)); applyGraphScale(); }
+function fitGraphContainer() {
+  const svg = els.graph.querySelector("svg");
+  if (!svg) return;
+  const preferredHeight = Math.ceil(svg.getBoundingClientRect().height + 52);
+  els.graphWrap.style.height = `${Math.max(220, Math.min(460, preferredHeight))}px`;
+}
 
 document.getElementById("zoom-out").addEventListener("click", () => setGraphScale(graphScale - 0.15));
 document.getElementById("zoom-in").addEventListener("click", () => setGraphScale(graphScale + 0.15));
@@ -383,7 +392,19 @@ document.getElementById("zoom-reset").addEventListener("click", () => setGraphSc
 els.graphWrap.addEventListener("wheel", (event) => { if (!event.ctrlKey) return; event.preventDefault(); setGraphScale(graphScale + (event.deltaY < 0 ? 0.1 : -0.1)); }, { passive: false });
 els.back.addEventListener("click", () => { const previous = navStack.pop(); if (previous) selectNode(previous, { pushHistory: false }); });
 els.treeSearch.addEventListener("input", (event) => { searchQuery = event.target.value; renderTree(); });
-document.getElementById("theme-toggle").addEventListener("click", (event) => { const dark = document.body.classList.toggle("dark-theme"); event.currentTarget.textContent = dark ? "Light" : "Black"; });
+const themeToggle = document.getElementById("theme-toggle");
+function applyTheme(theme) {
+  const dark = theme === "dark";
+  document.body.classList.toggle("dark-theme", dark);
+  themeToggle.textContent = dark ? "라이트 모드" : "다크 모드";
+  themeToggle.setAttribute("aria-pressed", String(dark));
+}
+applyTheme(localStorage.getItem("dungeonsync-theme") === "dark" ? "dark" : "light");
+themeToggle.addEventListener("click", () => {
+  const theme = document.body.classList.contains("dark-theme") ? "light" : "dark";
+  localStorage.setItem("dungeonsync-theme", theme);
+  applyTheme(theme);
+});
 document.getElementById("modal-close").addEventListener("click", () => document.getElementById("media-modal").close());
 
 const defaultCodePanelWidth = 460;
@@ -393,5 +414,12 @@ els.resizer.addEventListener("pointermove", (event) => { if (els.layout.classLis
 const finishResize = (event) => { if (els.layout.classList.contains("is-resizing")) { els.layout.classList.remove("is-resizing"); if (els.resizer.hasPointerCapture(event.pointerId)) els.resizer.releasePointerCapture(event.pointerId); } };
 els.resizer.addEventListener("pointerup", finishResize); els.resizer.addEventListener("pointercancel", finishResize); els.resizer.addEventListener("dblclick", () => setCodePanelWidth(defaultCodePanelWidth));
 
-mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "base", flowchart: { curve: "basis", htmlLabels: true } });
+mermaid.initialize({
+  startOnLoad: false,
+  securityLevel: "loose",
+  theme: "base",
+  themeVariables: { fontSize: "13px", fontFamily: "Segoe UI, Noto Sans KR, Arial, sans-serif" },
+  flowchart: { curve: "basis", htmlLabels: true, nodeSpacing: 24, rankSpacing: 34, padding: 8 },
+  sequence: { actorMargin: 30, messageMargin: 24, diagramMarginX: 20, diagramMarginY: 16 }
+});
 selectNode("overview", { pushHistory: false });

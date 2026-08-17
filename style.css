@@ -235,7 +235,7 @@ body.dark-theme {
   font-family: inherit;
   font-size: 13px;
   font-weight: 800;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0;
   text-align: left;
   cursor: pointer;
@@ -320,8 +320,8 @@ body.dark-theme {
 .zoom-controls button:hover, .code-actions button:hover { border-color: var(--accent); }
 
 .graph-wrap {
-  min-height: 480px;
-  max-height: 620px;
+  min-height: 220px;
+  max-height: 520px;
   margin: 16px;
   padding: 18px;
   overflow: auto;
@@ -331,14 +331,25 @@ body.dark-theme {
 }
 
 #graph {
-  min-width: 760px;
+  min-width: 620px;
+  width: 100%;
 }
 
 #graph svg {
   display: block;
-  margin: 0;
+  margin: 0 auto;
   max-width: none !important;
+  max-height: 440px;
 }
+
+#graph .nodeLabel,
+#graph .edgeLabel,
+#graph .label,
+#graph text { font-size: 13px !important; }
+
+#graph .node rect,
+#graph .node polygon,
+#graph .node path { stroke-width: 1.5px; }
 
 .graph-clickable, .graph-method-clickable { cursor: pointer; }
 .graph-clickable text, .graph-method-clickable text { text-decoration: underline; }
@@ -605,5 +616,8 @@ body.dark-theme {
   .tree { max-height: 420px; }
   .detail-grid, .script-list, .evidence-grid { grid-template-columns: 1fr; }
   .benchmark-kpis, .benchmark-device-grid, .benchmark-steps { grid-template-columns: 1fr; }
-  .graph-wrap { min-height: 360px; margin: 12px; }
+  .graph-head { flex-direction: column; }
+  .graph-tools { width: 100%; justify-content: flex-end; }
+  .graph-wrap { min-height: 300px; margin: 12px; padding: 12px; }
+  #graph { min-width: 560px; }
 }

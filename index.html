@@ -4,28 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="DirectX 11 렌더링, 비동기 리소스 스트리밍, 성능 진단, TCP 상태 동기화를 측정 가능한 형태로 구현한 C++20 엔진 연구 포트폴리오" />
-  <title>DungeonSync Engine Lab · Code Map</title>
-  <link rel="stylesheet" href="style.css?v=20260817" />
+  <title>DungeonSync 엔진 연구실 · 코드 맵</title>
+  <link rel="stylesheet" href="style.css?v=20260817-2" />
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.6/dist/mermaid.min.js"></script>
 </head>
-<body class="dark-theme">
+<body>
   <header class="topbar">
     <div>
-      <p class="eyebrow">DirectX 11 Engine Research Portfolio</p>
-      <h1>DungeonSync Engine Lab</h1>
+      <p class="eyebrow">DirectX 11 엔진 연구 포트폴리오</p>
+      <h1>DungeonSync 엔진 연구실</h1>
     </div>
-    <nav class="toplinks" aria-label="External links">
-      <a href="README.md">README</a>
-      <a href="Docs/AsyncResourceStreamingRequirements.md">Research Notes</a>
+    <nav class="toplinks" aria-label="외부 링크">
       <a href="https://github.com/SJ97p/DungeonSync" target="_blank" rel="noreferrer">GitHub</a>
-      <button id="theme-toggle" type="button" title="테마 전환">Light</button>
+      <button id="theme-toggle" type="button" title="테마 전환" aria-pressed="false">다크 모드</button>
     </nav>
   </header>
 
   <main id="layout" class="layout">
     <aside class="sidebar">
       <div class="panel-head">
-        <h2>Explorer</h2>
+        <h2>탐색기</h2>
         <label class="explorer-search" for="explorer-search">
           <span class="sr-only">모듈 검색</span>
           <input id="explorer-search" type="search" placeholder="시스템·클래스 검색..." autocomplete="off" />
@@ -37,11 +35,11 @@
     <section class="main-panel">
       <div class="panel-head graph-head">
         <div>
-          <h2 id="node-title">Overview</h2>
+          <h2 id="node-title">프로젝트 개요</h2>
           <p id="node-summary"></p>
         </div>
         <div class="graph-tools">
-          <button id="nav-back" class="back-button" type="button" disabled>Back</button>
+          <button id="nav-back" class="back-button" type="button" disabled>뒤로</button>
           <div class="zoom-controls" aria-label="그래프 확대/축소">
             <button id="zoom-out" type="button">−</button>
             <button id="zoom-reset" type="button">100%</button>
@@ -65,7 +63,7 @@
 
       <section id="script-section" class="script-section">
         <div class="section-head">
-          <h2>Core Sources</h2>
+          <h2>핵심 소스</h2>
           <p>클래스를 선택하면 설계 관계와 실제 C++ 소스를 함께 탐색할 수 있습니다.</p>
         </div>
         <div id="script-list" class="script-list"></div>
@@ -73,28 +71,28 @@
 
       <section id="evidence-section" class="evidence-section">
         <div class="section-head">
-          <h2>Measured Evidence</h2>
+          <h2>측정 증거</h2>
           <p>주장보다 재현 가능한 수치와 런타임 화면을 우선합니다.</p>
         </div>
         <div id="evidence" class="evidence-grid"></div>
       </section>
     </section>
 
-    <div id="code-resizer" class="code-resizer" role="separator" aria-label="Code Preview 너비 조절" aria-orientation="vertical" tabindex="0"></div>
+    <div id="code-resizer" class="code-resizer" role="separator" aria-label="코드 미리보기 너비 조절" aria-orientation="vertical" tabindex="0"></div>
 
     <aside id="code-panel" class="code-panel">
-      <div class="panel-head"><div><h2>Code Preview</h2><p id="code-path"></p></div></div>
+      <div class="panel-head"><div><h2>코드 미리보기</h2><p id="code-path"></p></div></div>
       <div id="code-actions" class="code-actions"></div>
-      <pre id="code-preview" class="code-preview"><code>Explorer 또는 그래프에서 시스템·클래스를 선택하세요.</code></pre>
+      <pre id="code-preview" class="code-preview"><code>탐색기 또는 그래프에서 시스템·클래스를 선택하세요.</code></pre>
     </aside>
   </main>
 
   <dialog id="media-modal" class="media-modal">
-    <button id="modal-close" class="modal-close" type="button">Close</button>
+    <button id="modal-close" class="modal-close" type="button">닫기</button>
     <img id="modal-image" alt="" />
     <p id="modal-caption"></p>
   </dialog>
 
-  <script src="app.js?v=20260817"></script>
+  <script src="app.js?v=20260817-2"></script>
 </body>
 </html>
