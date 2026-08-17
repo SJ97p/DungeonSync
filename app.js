@@ -316,6 +316,9 @@ const els = {
 let currentNodeId = "";
 let navStack = [];
 let graphScale = 1;
+let graphBaseSize = { width: 720, height: 360 };
+let graphPanState = null;
+let suppressGraphClick = false;
 let searchQuery = "";
 const expanded = new Set(treeGroups.map((group) => group.title));
 
@@ -393,25 +396,61 @@ function renderEvidence(node) {
 
 async function renderGraph(node) {
   els.graphWrap.dataset.diagram = node.graph.startsWith("classDiagram") ? "class" : "flow";
-  els.graph.removeAttribute("data-processed"); els.graph.innerHTML = node.graph;
+  els.graph.className = "mermaid";
+  els.graph.removeAttribute("data-processed"); els.graph.textContent = node.graph;
   try {
     await mermaid.run({ nodes: [els.graph] });
-    attachGraphClicks(node);
+    captureGraphBaseSize(node);
     graphScale = 1;
     applyGraphScale();
     fitGraphContainer();
+    resetGraphPan();
+    attachGraphClicks(node);
   }
   catch (error) { els.graph.textContent = `다이어그램을 표시하지 못했습니다: ${error.message}`; }
 }
 
 function attachGraphClicks(node) {
-  const svg = els.graph.querySelector("svg"); if (!svg || !node.links) return;
-  svg.querySelectorAll("g.node").forEach((group) => {
+  const svg = els.graph.querySelector("svg"); if (!svg) return;
+  const knownTitles = new Map(Object.entries(nodes).map(([id, item]) => [normalizeGraphLabel(item.title), id]));
+  svg.querySelectorAll("g.node, g.classGroup").forEach((group) => {
     const rawId = (group.id || "").replace(/^flowchart-/, "").replace(/-\d+$/, "");
-    const label = group.textContent.trim();
-    const target = node.links[rawId] || Object.entries(node.links).find(([key]) => label.includes(key))?.[1];
-    if (target) { group.classList.add("graph-clickable"); group.addEventListener("click", () => selectNode(target)); }
+    const label = graphGroupLabel(group);
+    const target = node.links?.[rawId]
+      || Object.entries(node.links || {}).find(([key]) => normalizeGraphLabel(label).includes(normalizeGraphLabel(key)))?.[1]
+      || knownTitles.get(normalizeGraphLabel(label));
+    if (!target || target === currentNodeId) return;
+    group.classList.add("graph-clickable");
+    group.addEventListener("click", () => {
+      if (!suppressGraphClick) selectNode(target);
+    });
   });
+
+  const methods = node.source?.methods || [];
+  if (!methods.length) return;
+  svg.querySelectorAll("text, span").forEach((element) => {
+    const label = element.textContent.trim();
+    const method = methods.find((item) => shortMethodName(item) === shortMethodName(label));
+    if (!method) return;
+    element.classList.add("graph-method-clickable");
+    element.addEventListener("click", (event) => {
+      event.stopPropagation();
+      jumpToMethod(method);
+    });
+  });
+}
+
+function graphGroupLabel(group) {
+  const classTitle = group.querySelector(".classTitle, .classTitleText");
+  return (classTitle?.textContent || group.querySelector(".nodeLabel")?.textContent || group.textContent || "").trim();
+}
+
+function normalizeGraphLabel(value) {
+  return String(value).replace(/[+:#()~<>]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function shortMethodName(value) {
+  return String(value).replace(/^.*::/, "").replace(/^\+/, "").replace(/\s.*$/, "").replace(/\(.*/, "").trim();
 }
 
 async function loadCode(source) {
@@ -429,7 +468,11 @@ function renderSource(source, focus) {
 
 function jumpToMethod(needle) {
   const rows = [...els.codePreview.querySelectorAll(".code-line")]; const row = rows.find((item) => item.textContent.includes(needle));
-  rows.forEach((item) => item.classList.remove("hit")); if (row) { row.classList.add("hit"); row.scrollIntoView({ block: "center" }); }
+  rows.forEach((item) => item.classList.remove("hit"));
+  if (row) {
+    row.classList.add("hit");
+    els.codePreview.scrollTo({ top: Math.max(0, row.offsetTop - els.codePreview.clientHeight * 0.45), behavior: "smooth" });
+  }
 }
 
 function highlight(line) {
@@ -442,19 +485,90 @@ function highlight(line) {
 function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function openMedia(item) { const dialog = document.getElementById("media-modal"); const image = document.getElementById("modal-image"); image.src = item.src; image.alt = item.caption; document.getElementById("modal-caption").textContent = item.caption; dialog.showModal(); }
 
-function applyGraphScale() { const svg = els.graph.querySelector("svg"); if (svg) { svg.style.transform = `scale(${graphScale})`; svg.style.transformOrigin = "top left"; } document.getElementById("zoom-reset").textContent = `${Math.round(graphScale * 100)}%`; }
-function setGraphScale(value) { graphScale = Math.max(0.55, Math.min(2.2, value)); applyGraphScale(); }
-function fitGraphContainer() {
+function captureGraphBaseSize(node) {
   const svg = els.graph.querySelector("svg");
   if (!svg) return;
-  const preferredHeight = Math.ceil(svg.getBoundingClientRect().height + 52);
-  els.graphWrap.style.height = `${Math.max(220, Math.min(460, preferredHeight))}px`;
+  const viewBox = svg.viewBox.baseVal;
+  const naturalWidth = viewBox?.width || svg.getBBox().width || 720;
+  const naturalHeight = viewBox?.height || svg.getBBox().height || 360;
+  const isClass = node.graph.startsWith("classDiagram");
+  const isSequence = node.graph.startsWith("sequenceDiagram");
+  const width = isClass ? clamp(naturalWidth, 300, 560) : isSequence ? clamp(naturalWidth * 0.9, 640, 920) : clamp(naturalWidth * 0.9, 560, 980);
+  graphBaseSize = { width, height: Math.max(170, width * naturalHeight / naturalWidth) };
+}
+
+function applyGraphScale() {
+  const svg = els.graph.querySelector("svg");
+  if (!svg) return;
+  const width = Math.round(graphBaseSize.width * graphScale);
+  const height = Math.round(graphBaseSize.height * graphScale);
+  svg.style.width = `${width}px`;
+  svg.style.height = `${height}px`;
+  els.graph.style.width = `${width}px`;
+  els.graph.style.height = `${height}px`;
+  document.getElementById("zoom-reset").textContent = `${Math.round(graphScale * 100)}%`;
+}
+
+function setGraphScale(value, anchor) {
+  const previous = graphScale;
+  graphScale = clamp(value, 0.55, 2.2);
+  if (graphScale === previous) return;
+  const point = anchor || { x: els.graphWrap.clientWidth / 2, y: els.graphWrap.clientHeight / 2 };
+  const contentX = els.graphWrap.scrollLeft + point.x;
+  const contentY = els.graphWrap.scrollTop + point.y;
+  applyGraphScale();
+  const ratio = graphScale / previous;
+  els.graphWrap.scrollLeft = contentX * ratio - point.x;
+  els.graphWrap.scrollTop = contentY * ratio - point.y;
+}
+
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+function fitGraphContainer() {
+  const preferredHeight = Math.ceil(graphBaseSize.height + 52);
+  els.graphWrap.style.height = `${clamp(preferredHeight, 220, 460)}px`;
+}
+
+function resetGraphPan() {
+  requestAnimationFrame(() => {
+    els.graphWrap.scrollLeft = Math.max(0, (els.graphWrap.scrollWidth - els.graphWrap.clientWidth) / 2);
+    els.graphWrap.scrollTop = 0;
+  });
 }
 
 document.getElementById("zoom-out").addEventListener("click", () => setGraphScale(graphScale - 0.15));
 document.getElementById("zoom-in").addEventListener("click", () => setGraphScale(graphScale + 0.15));
 document.getElementById("zoom-reset").addEventListener("click", () => setGraphScale(1));
-els.graphWrap.addEventListener("wheel", (event) => { if (!event.ctrlKey) return; event.preventDefault(); setGraphScale(graphScale + (event.deltaY < 0 ? 0.1 : -0.1)); }, { passive: false });
+els.graphWrap.addEventListener("wheel", (event) => {
+  if (!event.ctrlKey) return;
+  event.preventDefault();
+  const bounds = els.graphWrap.getBoundingClientRect();
+  setGraphScale(graphScale * Math.exp(-event.deltaY * 0.0012), { x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+}, { passive: false });
+els.graphWrap.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  graphPanState = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: els.graphWrap.scrollLeft, top: els.graphWrap.scrollTop, moved: false };
+  els.graphWrap.setPointerCapture(event.pointerId);
+});
+els.graphWrap.addEventListener("pointermove", (event) => {
+  if (!graphPanState || graphPanState.pointerId !== event.pointerId) return;
+  const dx = event.clientX - graphPanState.x;
+  const dy = event.clientY - graphPanState.y;
+  if (Math.abs(dx) + Math.abs(dy) > 4) graphPanState.moved = true;
+  if (!graphPanState.moved) return;
+  els.graphWrap.classList.add("is-panning");
+  els.graphWrap.scrollLeft = graphPanState.left - dx;
+  els.graphWrap.scrollTop = graphPanState.top - dy;
+});
+function finishGraphPan(event) {
+  if (!graphPanState || graphPanState.pointerId !== event.pointerId) return;
+  const moved = graphPanState.moved;
+  graphPanState = null;
+  els.graphWrap.classList.remove("is-panning");
+  if (els.graphWrap.hasPointerCapture(event.pointerId)) els.graphWrap.releasePointerCapture(event.pointerId);
+  if (moved) { suppressGraphClick = true; setTimeout(() => { suppressGraphClick = false; }, 0); }
+}
+els.graphWrap.addEventListener("pointerup", finishGraphPan);
+els.graphWrap.addEventListener("pointercancel", finishGraphPan);
 els.back.addEventListener("click", () => { const previous = navStack.pop(); if (previous) selectNode(previous, { pushHistory: false }); });
 els.treeSearch.addEventListener("input", (event) => { searchQuery = event.target.value; renderTree(); });
 const themeToggle = document.getElementById("theme-toggle");
