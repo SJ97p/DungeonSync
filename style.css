@@ -114,7 +114,15 @@ body.dark-theme {
 .graph-clickable { cursor: pointer; }
 .graph-clickable:hover polygon,
 .graph-clickable:hover rect,
-.graph-clickable:hover path { stroke: #d99524 !important; stroke-width: 3px !important; }
+.graph-clickable:hover path {
+  stroke: var(--accent-2) !important;
+  stroke-width: 2.25px !important;
+  filter: drop-shadow(0 3px 7px rgba(15, 127, 117, 0.24));
+}
+
+.graph-clickable:hover .label,
+.graph-clickable:hover .nodeLabel,
+.graph-method-clickable:hover { color: var(--accent-2) !important; }
 
 .sidebar, .main-panel, .code-panel {
   min-width: 0;
@@ -370,7 +378,8 @@ body.dark-theme {
 #graph .node path { stroke-width: 1.5px; }
 
 .graph-clickable, .graph-method-clickable { cursor: pointer; }
-.graph-clickable text, .graph-method-clickable text { text-decoration: underline; }
+.graph-method-clickable { border-radius: 3px; transition: color 120ms ease, background 120ms ease; }
+.graph-method-clickable:hover { background: color-mix(in srgb, var(--accent-2) 12%, transparent); }
 
 .benchmark-report {
   padding: 16px;

@@ -176,7 +176,7 @@ const nodes = {
       R->>R: mutex로 최신 상태 게시
       C->>R: TryConsumeLatest
       C->>C: Snap 또는 보간`,
-    links: {},
+    links: { "클라이언트 메인": "application", "TCP 서버": "tcplistener", "수신 스레드": "serverstatereceiver" },
     scripts: ["tcpclient", "serverstatereceiver", "packet", "tcplistener", "application"],
     evidence: []
   },
@@ -205,13 +205,15 @@ const nodes = {
         +Stop() void
       }
       AsyncTextureLoader *-- WicTextureLoader`, scripts: [], source: code("Client/Rendering/AsyncTextureLoader.cpp", "bool AsyncTextureLoader::Start", ["AsyncTextureLoader::Start", "AsyncTextureLoader::Request", "AsyncTextureLoader::WorkerMain", "AsyncTextureLoader::Stop"]) },
-  textureresourcemanager: { type: "class", title: "TextureResourceManager", summary: "요청 상태, 캐시, 메인 스레드 업로드와 메모리 통계를 관리합니다.", intent: "비동기 작업과 렌더러 사이의 정책 계층입니다.", issue: "GPU API 호출 위치와 resource state 전이가 명확해야 합니다.", final: "Unloaded→Queued→ReadyForUpload→Ready/Failed 상태와 path cache를 유지합니다.", next: "Eviction policy와 resource group dependency가 필요합니다.", graph: `stateDiagram-v2
-      [*] --> Unloaded
-      Unloaded --> Queued: RequestAsync
-      Queued --> ReadyForUpload: Decode complete
-      ReadyForUpload --> Ready: GPU upload
-      Queued --> Failed
-      ReadyForUpload --> Failed`, scripts: [], source: code("Client/Rendering/TextureResourceManager.cpp", "bool TextureResourceManager::RequestAsync", ["TextureResourceManager::RequestAsync", "TextureResourceManager::Update", "TextureResourceManager::Statistics"]) },
+  textureresourcemanager: { type: "class", title: "TextureResourceManager", summary: "요청 상태, 캐시, 메인 스레드 업로드와 메모리 통계를 관리합니다.", intent: "비동기 작업과 렌더러 사이의 정책 계층입니다.", issue: "GPU API 호출 위치와 resource state 전이가 명확해야 합니다.", final: "Unloaded→Queued→ReadyForUpload→Ready/Failed 상태와 path cache를 유지합니다.", next: "Eviction policy와 resource group dependency가 필요합니다.", graph: `flowchart TB
+      REQUEST[RequestAsync] --> MANAGER[TextureResourceManager]
+      MANAGER --> QUEUED[Queued]
+      QUEUED --> LOADER[AsyncTextureLoader]
+      LOADER --> WIC[WicTextureLoader]
+      LOADER --> READY[ReadyForUpload]
+      READY --> MANAGER
+      MANAGER --> RENDERER[D3D11Renderer]
+      MANAGER --> CACHE[Ready / Failed Cache]`, links: { LOADER: "asynctextureloader", WIC: "wictextureloader", RENDERER: "d3d11renderer" }, scripts: [], source: code("Client/Rendering/TextureResourceManager.cpp", "bool TextureResourceManager::RequestAsync", ["TextureResourceManager::RequestAsync", "TextureResourceManager::Update", "TextureResourceManager::Statistics"]) },
   wictextureloader: { type: "class", title: "WicTextureLoader", summary: "WIC 파일 디코드와 D3D11 texture creation을 분리합니다.", intent: "CPU 작업과 GPU 작업의 경계를 API에 반영합니다.", issue: "COM apartment와 WIC factory는 worker 소유권이 필요합니다.", final: "DecodeFromFile은 RGBA8 pixels, CreateTextureFromDecodedImage는 SRV를 생성합니다.", next: "mipmap 생성과 압축 포맷 지원이 남아 있습니다.", graph: `classDiagram
       class WicTextureLoader {
         +Initialize() bool
@@ -258,20 +260,20 @@ const nodes = {
         +Rebuild()
         +QueryAabb()
       }
-      SpatialGrid --> Monster`, scripts: [], source: code("Client/Gameplay/SpatialGrid.cpp", "void SpatialGrid::Rebuild", ["SpatialGrid::Rebuild", "SpatialGrid::QueryAabb"]) },
+       SpatialGrid --> CombatSystem`, links: { CombatSystem: "combatsystem" }, scripts: [], source: code("Client/Gameplay/SpatialGrid.cpp", "void SpatialGrid::Rebuild", ["SpatialGrid::Rebuild", "SpatialGrid::QueryAabb"]) },
   combatsystem: { type: "class", title: "CombatSystem", summary: "broad-phase 후보에 정확한 거리·방향 판정을 적용합니다.", intent: "후보 수집과 피격 규칙을 분리합니다.", issue: "broad phase만으로 hit를 확정하면 false positive가 생깁니다.", final: "거리 제곱과 dot product를 사용해 sqrt 없이 판정합니다.", next: "공격 shape 전략 객체로 확장할 수 있습니다.", graph: `classDiagram
       class CombatSystem {
         +AttackCircle()
         +AttackCone()
       }
-      CombatSystem --> SpatialGrid`, scripts: [], source: code("Client/Gameplay/CombatSystem.cpp", "CombatSystem::", ["CombatSystem::Attack", "CombatSystem::ConeAttack"]) },
+       CombatSystem --> SpatialGrid`, links: { SpatialGrid: "spatialgrid" }, scripts: [], source: code("Client/Gameplay/CombatSystem.cpp", "CombatSystem::", ["CombatSystem::Attack", "CombatSystem::ConeAttack"]) },
   demoscene: { type: "class", title: "DemoScene", summary: "이동·점프·전투방과 RenderItem 생성을 연결합니다.", intent: "엔진 기능을 확인할 최소 플레이 환경입니다.", issue: "콘텐츠 확장보다 기술 검증 범위가 우선입니다.", final: "3개 방, 공격 이펙트 풀, 서버 위치 보정을 통합합니다.", next: "animation state와 data-driven room 정의가 남아 있습니다.", graph: `classDiagram
       class DemoScene {
         +Update()
         +RenderItems()
         +ReconcilePlayerPosition()
       }
-      DemoScene *-- CombatSystem`, scripts: [], source: code("Client/Presentation/DemoScene.cpp", "void DemoScene::Update", ["DemoScene::Update", "DemoScene::ReconcilePlayerPosition"]) },
+       DemoScene *-- CombatSystem`, links: { CombatSystem: "combatsystem" }, scripts: [], source: code("Client/Presentation/DemoScene.cpp", "void DemoScene::Update", ["DemoScene::Update", "DemoScene::ReconcilePlayerPosition"]) },
   tcpclient: { type: "class", title: "TcpClient", summary: "SOCKET 소유권과 send lifecycle을 RAII로 관리합니다.", intent: "조기 반환과 오류에서도 소켓을 누수하지 않습니다.", issue: "복사되면 동일 SOCKET을 두 객체가 닫을 수 있습니다.", final: "복사를 삭제하고 Connect/Send/Disconnect의 소유권을 한 객체에 둡니다.", next: "partial send queue와 reconnect policy가 필요합니다.", graph: `classDiagram
       class TcpClient {
         +Connect() bool
@@ -284,10 +286,12 @@ const nodes = {
         +TryConsumeLatest() bool
         +Stop()
       }
-      ServerStateReceiver --> TcpClient`, scripts: [], source: code("Client/Network/ServerStateReceiver.cpp", "bool ServerStateReceiver::Start", ["ServerStateReceiver::Start", "ServerStateReceiver::TryConsumeLatest", "ServerStateReceiver::Stop"]) },
+       ServerStateReceiver --> TcpClient`, links: { TcpClient: "tcpclient" }, scripts: [], source: code("Client/Network/ServerStateReceiver.cpp", "bool ServerStateReceiver::Start", ["ServerStateReceiver::Start", "ServerStateReceiver::TryConsumeLatest", "ServerStateReceiver::Stop"]) },
   packet: { type: "class", title: "Packet Contract", summary: "클라이언트와 서버가 공유하는 고정 크기 wire contract입니다.", intent: "패킷 크기·타입·sequence를 공통 정의합니다.", issue: "TCP byte stream에는 메시지 경계가 없습니다.", final: "현재 고정 크기 packet을 정확한 byte 수만큼 수신합니다.", next: "가변 payload에는 누적 버퍼와 header validation이 필요합니다.", graph: `classDiagram
-      class PlayerMovePacket
-      class PlayerStatePacket`, scripts: [], source: code("Shared/Network/Packet.h", "struct PlayerMovePacket", ["PlayerMovePacket", "PlayerStatePacket"]) },
+       class PlayerMovePacket
+       class PlayerStatePacket
+       PlayerMovePacket --> TcpClient
+       PlayerStatePacket --> TcpListener`, links: { TcpClient: "tcpclient", TcpListener: "tcplistener" }, scripts: [], source: code("Shared/Network/Packet.h", "struct PlayerMovePacket", ["PlayerMovePacket", "PlayerStatePacket"]) },
   tcplistener: { type: "class", title: "TcpListener", summary: "서버의 bind·listen·accept 수명을 관리합니다.", intent: "네트워크 시작 실패와 세션 종료를 명확히 처리합니다.", issue: "현재 단일 클라이언트 실험 범위입니다.", final: "Winsock runtime 이후 listener를 만들고 한 세션의 packet loop를 수행합니다.", next: "다중 session dispatcher와 IOCP가 확장 방향입니다.", graph: `classDiagram
       class TcpListener {
         +Start() bool
@@ -295,6 +299,14 @@ const nodes = {
         +Stop()
       }`, scripts: [], source: code("Server/Network/TcpListener.cpp", "bool TcpListener::Start", ["TcpListener::Start", "TcpListener::Accept", "TcpListener::Stop"]) }
 };
+
+const navigationAliases = new Map([
+  ["playermovepacket", "packet"],
+  ["playerstatepacket", "packet"],
+  ["tcpserver", "tcplistener"],
+  ["clientmain", "application"],
+  ["receiverthread", "serverstatereceiver"]
+]);
 
 const treeGroups = [
   { title: "프로젝트 개요", ids: ["overview"] },
@@ -413,13 +425,21 @@ async function renderGraph(node) {
 function attachGraphClicks(node) {
   const svg = els.graph.querySelector("svg"); if (!svg) return;
   const knownTitles = new Map(Object.entries(nodes).map(([id, item]) => [normalizeGraphLabel(item.title), id]));
-  svg.querySelectorAll("g.node, g.classGroup").forEach((group) => {
-    const rawId = (group.id || "").replace(/^flowchart-/, "").replace(/-\d+$/, "");
+  svg.querySelectorAll("g.node, g.classGroup, g.actor").forEach((group) => {
+    const rawId = normalizeGraphLabel((group.id || "").replace(/^flowchart-/, "").replace(/^classId-/, "").replace(/-\d+$/, ""));
     const label = graphGroupLabel(group);
-    const target = node.links?.[rawId]
-      || Object.entries(node.links || {}).find(([key]) => normalizeGraphLabel(label).includes(normalizeGraphLabel(key)))?.[1]
-      || knownTitles.get(normalizeGraphLabel(label));
+    const target = resolveGraphTarget(node, knownTitles, rawId, label);
     if (!target || target === currentNodeId) return;
+    group.classList.add("graph-clickable");
+    group.addEventListener("click", () => {
+      if (!suppressGraphClick) selectNode(target);
+    });
+  });
+
+  svg.querySelectorAll("text.actor").forEach((actor) => {
+    const group = actor.parentElement;
+    const target = resolveGraphTarget(node, knownTitles, "", actor.textContent.trim());
+    if (!group || !target || target === currentNodeId) return;
     group.classList.add("graph-clickable");
     group.addEventListener("click", () => {
       if (!suppressGraphClick) selectNode(target);
@@ -438,6 +458,14 @@ function attachGraphClicks(node) {
       jumpToMethod(method);
     });
   });
+}
+
+function resolveGraphTarget(node, knownTitles, rawId, label) {
+  const normalizedLabel = normalizeGraphLabel(label);
+  return Object.entries(node.links || {}).find(([key]) => normalizeGraphLabel(key) === rawId)?.[1]
+    || Object.entries(node.links || {}).find(([key]) => normalizedLabel.includes(normalizeGraphLabel(key)))?.[1]
+    || knownTitles.get(normalizedLabel)
+    || navigationAliases.get(normalizedLabel);
 }
 
 function graphGroupLabel(group) {
@@ -493,7 +521,9 @@ function captureGraphBaseSize(node) {
   const naturalHeight = viewBox?.height || svg.getBBox().height || 360;
   const isClass = node.graph.startsWith("classDiagram");
   const isSequence = node.graph.startsWith("sequenceDiagram");
-  const width = isClass ? clamp(naturalWidth, 300, 560) : isSequence ? clamp(naturalWidth * 0.9, 640, 920) : clamp(naturalWidth * 0.9, 560, 980);
+  const width = isClass ? clamp(naturalWidth, 280, 500)
+    : isSequence ? clamp(naturalWidth * 0.9, 640, 920)
+      : clamp(naturalWidth * 0.72, 460, 760);
   graphBaseSize = { width, height: Math.max(170, width * naturalHeight / naturalWidth) };
 }
 
@@ -575,7 +605,9 @@ const themeToggle = document.getElementById("theme-toggle");
 function applyTheme(theme) {
   const dark = theme === "dark";
   document.body.classList.toggle("dark-theme", dark);
-  themeToggle.textContent = dark ? "라이트 모드" : "다크 모드";
+  themeToggle.textContent = dark ? "Light" : "Night";
+  themeToggle.title = dark ? "Light 테마로 전환" : "Night 테마로 전환";
+  themeToggle.setAttribute("aria-label", themeToggle.title);
   themeToggle.setAttribute("aria-pressed", String(dark));
 }
 applyTheme(localStorage.getItem("dungeonsync-theme") === "dark" ? "dark" : "light");
