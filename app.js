@@ -205,15 +205,13 @@ const nodes = {
         +Stop() void
       }
       AsyncTextureLoader *-- WicTextureLoader`, links: { WicTextureLoader: "wictextureloader" }, scripts: [], source: code("Client/Rendering/AsyncTextureLoader.cpp", "bool AsyncTextureLoader::Start", ["AsyncTextureLoader::Start", "AsyncTextureLoader::Request", "AsyncTextureLoader::WorkerMain", "AsyncTextureLoader::Stop"]) },
-  textureresourcemanager: { type: "class", title: "TextureResourceManager", summary: "요청 상태, 캐시, 메인 스레드 업로드와 메모리 통계를 관리합니다.", intent: "비동기 작업과 렌더러 사이의 정책 계층입니다.", issue: "GPU API 호출 위치와 resource state 전이가 명확해야 합니다.", final: "Unloaded→Queued→ReadyForUpload→Ready/Failed 상태와 path cache를 유지합니다.", next: "Eviction policy와 resource group dependency가 필요합니다.", graph: `flowchart TB
+  textureresourcemanager: { type: "class", title: "TextureResourceManager", summary: "요청 상태, 캐시, 메인 스레드 업로드와 메모리 통계를 관리합니다.", intent: "비동기 작업과 렌더러 사이의 정책 계층입니다.", issue: "GPU API 호출 위치와 resource state 전이가 명확해야 합니다.", final: "Unloaded→Queued→ReadyForUpload→Ready/Failed 상태와 path cache를 유지합니다.", next: "Eviction policy와 resource group dependency가 필요합니다.", graph: `flowchart LR
       REQUEST[RequestAsync] --> MANAGER[TextureResourceManager]
-      MANAGER --> QUEUED[Queued]
-      QUEUED --> LOADER[AsyncTextureLoader]
+      MANAGER --> LOADER[AsyncTextureLoader]
       LOADER --> WIC[WicTextureLoader]
       LOADER --> READY[ReadyForUpload]
-      READY --> MANAGER
-      MANAGER --> RENDERER[D3D11Renderer]
-      MANAGER --> CACHE[Ready / Failed Cache]`, links: { LOADER: "asynctextureloader", WIC: "wictextureloader", RENDERER: "d3d11renderer" }, scripts: [], source: code("Client/Rendering/TextureResourceManager.cpp", "bool TextureResourceManager::RequestAsync", ["TextureResourceManager::RequestAsync", "TextureResourceManager::Update", "TextureResourceManager::Statistics"]) },
+      READY --> RENDERER[D3D11Renderer]
+      MANAGER --> CACHE[Path Cache]`, links: { LOADER: "asynctextureloader", WIC: "wictextureloader", RENDERER: "d3d11renderer" }, scripts: [], source: code("Client/Rendering/TextureResourceManager.cpp", "bool TextureResourceManager::RequestAsync", ["TextureResourceManager::RequestAsync", "TextureResourceManager::Update", "TextureResourceManager::Statistics"]) },
   wictextureloader: { type: "class", title: "WicTextureLoader", summary: "WIC 파일 디코드와 D3D11 texture creation을 분리합니다.", intent: "CPU 작업과 GPU 작업의 경계를 API에 반영합니다.", issue: "COM apartment와 WIC factory는 worker 소유권이 필요합니다.", final: "DecodeFromFile은 RGBA8 pixels, CreateTextureFromDecodedImage는 SRV를 생성합니다.", next: "mipmap 생성과 압축 포맷 지원이 남아 있습니다.", graph: `classDiagram
       class WicTextureLoader {
         +Initialize() bool
@@ -263,18 +261,10 @@ const nodes = {
       }
       BenchmarkSession --> RenderingStressScene
       BenchmarkSession --> FrameTimeProfiler`, links: { RenderingStressScene: "renderingstressscene", FrameTimeProfiler: "frametimeprofiler" }, scripts: [], source: code("Client/Diagnostics/BenchmarkSession.cpp", "void BenchmarkSession::Start", ["BenchmarkSession::Start", "BenchmarkSession::Update"]) },
-  spatialgrid: { type: "class", title: "SpatialGrid", summary: "월드 좌표를 정수 cell key로 매핑하고 영역 후보를 반환합니다.", intent: "공격마다 전체 몬스터를 순회하지 않습니다.", issue: "음수 좌표에서도 truncation이 아니라 floor가 필요합니다.", final: "AABB가 걸치는 min/max cell 범위를 순회합니다.", next: "동적 update 비용을 계측할 수 있습니다.", graph: `classDiagram
-      class SpatialGrid {
-        +Rebuild()
-        +QueryAabb()
-      }
-       SpatialGrid --> CombatSystem`, links: { CombatSystem: "combatsystem" }, scripts: [], source: code("Client/Gameplay/SpatialGrid.cpp", "void SpatialGrid::Rebuild", ["SpatialGrid::Rebuild", "SpatialGrid::QueryAabb"]) },
-  combatsystem: { type: "class", title: "CombatSystem", summary: "broad-phase 후보에 정확한 거리·방향 판정을 적용합니다.", intent: "후보 수집과 피격 규칙을 분리합니다.", issue: "broad phase만으로 hit를 확정하면 false positive가 생깁니다.", final: "거리 제곱과 dot product를 사용해 sqrt 없이 판정합니다.", next: "공격 shape 전략 객체로 확장할 수 있습니다.", graph: `classDiagram
-      class CombatSystem {
-        +AttackCircle()
-        +AttackCone()
-      }
-       CombatSystem --> SpatialGrid`, links: { SpatialGrid: "spatialgrid" }, scripts: [], source: code("Client/Gameplay/CombatSystem.cpp", "CombatSystem::", ["CombatSystem::Attack", "CombatSystem::ConeAttack"]) },
+  spatialgrid: { type: "class", title: "SpatialGrid", summary: "월드 좌표를 정수 cell key로 매핑하고 영역 후보를 반환합니다.", intent: "공격마다 전체 몬스터를 순회하지 않습니다.", issue: "음수 좌표에서도 truncation이 아니라 floor가 필요합니다.", final: "AABB가 걸치는 min/max cell 범위를 순회합니다.", next: "동적 update 비용을 계측할 수 있습니다.", graph: `flowchart LR
+      GRID[SpatialGrid<br/>Rebuild · QueryAabb] --> COMBAT[CombatSystem<br/>Broad / Narrow Phase]`, links: { COMBAT: "combatsystem" }, scripts: [], source: code("Client/Gameplay/SpatialGrid.cpp", "void SpatialGrid::Rebuild", ["SpatialGrid::Rebuild", "SpatialGrid::QueryAabb"]) },
+  combatsystem: { type: "class", title: "CombatSystem", summary: "broad-phase 후보에 정확한 거리·방향 판정을 적용합니다.", intent: "후보 수집과 피격 규칙을 분리합니다.", issue: "broad phase만으로 hit를 확정하면 false positive가 생깁니다.", final: "거리 제곱과 dot product를 사용해 sqrt 없이 판정합니다.", next: "공격 shape 전략 객체로 확장할 수 있습니다.", graph: `flowchart LR
+      COMBAT[CombatSystem<br/>AttackCircle · AttackCone] --> GRID[SpatialGrid<br/>Rebuild · QueryAabb]`, links: { GRID: "spatialgrid" }, scripts: [], source: code("Client/Gameplay/CombatSystem.cpp", "CombatSystem::", ["CombatSystem::Attack", "CombatSystem::ConeAttack"]) },
   demoscene: { type: "class", title: "DemoScene", summary: "이동·점프·전투방과 RenderItem 생성을 연결합니다.", intent: "엔진 기능을 확인할 최소 플레이 환경입니다.", issue: "콘텐츠 확장보다 기술 검증 범위가 우선입니다.", final: "3개 방, 공격 이펙트 풀, 서버 위치 보정을 통합합니다.", next: "animation state와 data-driven room 정의가 남아 있습니다.", graph: `classDiagram
       class DemoScene {
         +Update()
