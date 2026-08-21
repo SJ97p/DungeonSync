@@ -12,6 +12,10 @@ DirectX 11 온라인 게임 클라이언트의 렌더링, 리소스 스트리밍
 
 > [Interactive Engine Code Map](https://sj97p.github.io/DungeonSync/) · [Repository](https://github.com/SJ97p/DungeonSync)
 
+![DungeonSync client-server approved movement demo](Assets/evidence/client-server-approved-move.gif)
+
+> DirectX 11 2.5D 전투 데모. 왼쪽은 런타임 진단 오버레이가 있는 클라이언트이고, 오른쪽은 이동 패킷을 검증한 서버의 `Approved move` 로그입니다.
+
 ## 핵심 결과
 
 | 연구 항목 | Before / 비교군 | After / 적용군 | 검증 결과 |
@@ -24,7 +28,7 @@ DirectX 11 온라인 게임 클라이언트의 렌더링, 리소스 스트리밍
 
 측정 환경과 드라이버에 따라 절대 수치는 달라질 수 있습니다. 목적은 특정 숫자를 일반화하는 것이 아니라 **동일 조건을 만들고 병목 구간을 분리해 개선 효과를 검증하는 과정**을 보여주는 것입니다.
 
-![DungeonSync diagnostics with 10,000 instanced sprites](assets/evidence/diagnostics-10000-instanced.png)
+![DungeonSync diagnostics with 10,000 instanced sprites](Assets/evidence/diagnostics-10000-instanced.png)
 
 ## 기술적 초점
 
@@ -131,6 +135,25 @@ Broad phase는 정확한 피격 판정이 아니라 **놓치지 않는 저비용
 - 종료 시 `shutdown`으로 blocking `recv`를 깨운 뒤 worker `join`
 
 현재 서버는 학습 목적의 단일 클라이언트·고정 크기 패킷 범위입니다. TCP의 신뢰성과 순서 보장은 메시지 경계 보장을 의미하지 않으므로, 가변 패킷 확장에는 누적 수신 버퍼와 header validation이 필요합니다.
+
+#### 연결·검증·종료 증거
+
+![TCP server connection and approved movement](Assets/evidence/tcp-server-connected.png)
+
+서버가 먼저 `listen` 상태가 된 뒤에만 클라이언트 연결을 허용합니다. 연결 후 `PlayerMovePacket` 수신과 sequence 기반 이동 검증을 로그로 확인합니다.
+
+<details>
+<summary>정상 종료와 서버 미실행 시 처리 보기</summary>
+
+**정상 종료** — 클라이언트가 종료되면 서버가 연결 해제를 감지합니다.
+
+![TCP client disconnected](Assets/evidence/tcp-client-disconnected.png)
+
+**연결 실패** — 서버가 실행되지 않은 상태에서는 클라이언트를 계속 실행하지 않고 연결 오류를 표시합니다.
+
+![TCP server unavailable](Assets/evidence/tcp-server-unavailable.png)
+
+</details>
 
 ## 구조
 
